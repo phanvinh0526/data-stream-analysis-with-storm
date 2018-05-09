@@ -1,0 +1,438 @@
+<html>
+<head>
+<meta charset="UTF-8">
+<link rel="stylesheet" type="text/css" href=".\thesis.css">
+<script type="text/x-mathjax-config">
+  MathJax.Hub.Config({tex2jax: {inlineMath: [['$','$'], ['\\(','\\)']]}});
+</script>
+<script type="text/javascript"
+  src="http://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML">
+</script>
+</head>
+<body>
+<h1>CHƯƠNG 5: PHƯƠNG PHÁP KHAI THÁC FREQUENT ITEMS TRONG DATA STREAM</h1>
+<p class="abstract">Trong chương này, chúng tôi sẽ trình bày thuật toán khai thác frequent item
+trên data stream là TwMinSwap. Thuật toán này được lựa chọn từ một hội nghị
+uy tín CIKM - International Conference on Information and Knowledge
+Management đạt rank A xuất bản vào năm 2014. Thuật toán TwMinSwap chỉ yêu
+cầu O(k) không gian bộ nhớ với k là top k items có độ phổ biến cao nhất. Cuối
+cùng, chúng tôi sẽ trình bày cách mà thuật toán TwMinSwap được triển khai vào
+hệ thống thời gian thực mà chúng tôi đang xây dựng như thế nào.</p>
+<h3>Các mục chính trong chương:</h3>
+<p><a href="#5.1">5.1. Giới thiệu</a></p>
+<p><a href="#5.2">5.2. Ký hiệu được sử dụng trong thuật toán khai thác items</a></p>
+<p><a href="#5.3">5.3. Thuật toán đề xuất</a></p>
+<p><a href="#5.4">5.4. Thí nghiệm</a></p>
+<p><a href="#5.5">5.5. Vận dụng</a></p>
+<p><a href="#5.6">5.6. Tổng kết</a></p>
+<h2><a name="5.1">5.1. Giới thiệu</a></h2>
+<p>Khai thác recent frequent items là một bài toán con của khai thác frequent items,
+trong đó ta tập trung tìm ra những frequent items mới xuất hiện và dần loại bỏ đi
+những frequent items đã cũ. Với ngữ cảnh ứng dụng, bài toán này là phổ biến. Ví dụ,
+khi ta theo dõi những từ khóa từ SNS, thật là quan trọng để biết từ khóa nào là xu
+hướng mới và từ khóa nào là xu hướng cũ. Nhiều nguyên cứu tìm kiếm những recent
+frequent items được nguyên cứu. Tuy nhiên, chúng bị giới hạn về độ chính xác, thời
+gian chạy, và sử dụng bộ nhớ.</p>
+<p>Vào năm 2014, tại hội nghị CIKM, Y.Lim, J.Choi và U.Kang đã đề xuất một
+phương pháp nhanh, chính xác, và sử dụng hiệu quả bộ nhớ cho việc theo dõi recent
+frequent items đó là thuật toán TwMinSwap [16]. Thuật toán TwMinSwap là phiên
+bản tất định của thuật toán lấy mẫu TwSample mà có một sự đảm bảo tốt về mặt lý
+thuyết. Thuật toán TwMinSwap hoàn thiện TwSample cả về tốc độ xử lý, độ chính
+xác và sử dụng bộ nhớ. Cả hai chỉ yêu cầu O(k) không gian bộ nhớ và không cần biết
+trước về stream như là chiều của nó hay số lượng items phân biệt trên stream. Đặc
+biệt, thuật toán chỉ yêu cầu hai tham số là k và 𝛼 và sự đơn giản này không chỉ cho
+phép tiết kiệm vùng nhớ mà còn giảm thời gian xử lý mỗi items (per-item processing
+time). Thí nghiệm chỉ ra, thuật toán TwMinSwap chạy tốt hơn những thuật toán cạnh
+64
+tranh khác ở những khía cạnh precision & recall, error trong time-weighted count, sử
+dụng bộ nhớ và thời gian xử lý trong Bảng 5-1.</p>
+<table border="1" align="center">
+<tr>
+<th></th>
+<th colspan="2">[Recommended]</th>
+<th colspan="2">Competitors</th>
+</tr>
+<tr>
+<td></td>
+<td>TwMinSwap [16]</td>
+<td>TwSample [16]</td>
+<td>TwFreq [28]</td>
+<td>TwHCount [29]</td>
+</tr>
+<tr>
+<td>Precision & Recall</td>
+<td><b>Hightest</b></td>
+<td>Low</td>
+<td><del>Lowest</del></td>
+<td>High</td>
+</tr>
+<tr>
+<td>Error in TwHCount</td>
+<td><b>Lowest</b></td>
+<td>Medium</td>
+<td><del>Highest</del></td>
+<td><b>Lowest</b></td>
+</tr>
+<tr>
+<td>Memory Usage</td>
+<td><b>Smallest</b></td>
+<td><del>Largest</del></td>
+<td>Small</td>
+<td><del>Largest</del></td>
+</tr>
+<tr>
+<td>Time</td>
+<td>Fast</td>
+<td><del>Slowest</del></td>
+<td>Medium</td>
+<td><b>Fastest</b></td>
+</tr>
+</table>
+<h4 align="center"><a name="tab05-01">Bảng 5-1: Bảng so sánh giữa TwMinSwap với các thuật toán khác [16]</a></h4>
+<h2><a name="5.2">5.2. Ký hiệu được sử dụng trong thuật toán khai thác items</a></h2>
+<p>Bảng bên dưới liệt kê tập các ký hiệu và mô tả, những ký hiệu này được dùng
+xuyên suốt thuật toán sẽ được trình bày bên dưới.</p>
+<table  border="1" align="center">
+<tr>
+<th>Ký hiệu</th>
+<th>Mô tả</th>
+</tr>
+<tr>
+<td>L<br>N<br>k<br>$\alpha$<br>u,v<br>c,c<sub>u</sub><br>T<sub>u</sub><br>W(u)<br>P(u)<br>t,t<sub>i</sub>/t<sub>cur</sub><br>K<br>$\lambda$<br>$\sigma$
+</td>
+<td>Chiều dài của stream<br>Số lượng items phân biệt<br>Số lượng (time-weighted) frequent items<br>Time decay factor<br>Định dạng của item<br>Số đếm
+(của u)<br>Tập các mốc thời gian mà u xảy ra<br>Time-weighted count của u<br>Penalized time-weighted count của u<br>thời điểm/ thời điểm hiện tại<br>Tập các (time-weighted) frequent items đã khai thác được
+<br>Penalty term cho P(u)<br>Tỉ lệ tăng của $\lambda$
+</td>
+</tr>
+</table>
+<h4 align="center"><a name="tab05-02">Bảng 5-2: Các ký hiệu được dùng trong chương này [16]</a></h4>
+<h2><a name="5.3">5.3. Thuật toán đề xuất</a></h2>
+<p>Tác giả đã đề xuất 1 phương pháp để tìm time-weighted top-k items một cách
+hiệu quả từ data stream là thuật toán TwMinSwap. Thuật toán TwMinSwap chỉ yêu
+cầu O(k) không gian bộ nhớ với k là số time-weighted top-k items mà ta muốn tìm.
+Thuật toán TwMinSwap đạt được bằng cách derandomization từ thuật toán lấy mẫu
+TwSample. Để phát triển thuật toán TwMinSwap, ta sẽ trình bày trước về thuật toán
+TwSample. Thuật toán TwSample có sự đảm bảo tốt về mặt lý thuyết. Tuy nhiên, đặc
+điểm xác xuất của TwSample yêu cầu nhiều session lấy mẫu không phụ thuộc để đạt
+được độ chính xác cao, dẩn tới không gian sử dụng bộ nhớ lớn và thời gian chạy
+chậm. Mặt khác, TwMinSwap đạt được độ chính xác cao với thời gian chạy nhanh
+trong khi chỉ sử dụng session đơn.</p>
+<p>Định nghĩa 1: (Time-Weighted Count). Cho u là 1 item xảy ra tại thời điểm
+t1,t2,…,tc. Time-weighted count của item u được định nghĩa bởi công thức sau và :$$W(u) = \sum_{i=1}^{c}\alpha^{t_{cur}-t_{i}}$$</p>
+<ul>
+<li>a là decay paremeter</li>
+<li>$t_{cur}$ là thời điểm hiện tại</li>
+</ul>
+<h3 class="subheader1">5.3.1. Thuật toán ngẫu nhiên TwSample</h3>
+<p>Để phát triển 1 thuật toán lấy mẫu, đầu tiên ta định nghĩa penalized time-weighted
+count như bên dưới</p>
+<p>Định nghĩa 2: (Penalized Time-Weighted Count). Cho u là 1 item xảy ra trong
+data stream và Tu là tập các thời điểm mà u xảy ra. Penalized time-weighted count
+của u được định nghĩa bởi: $$W(u) = \sum_{i \in T_{u}}\alpha^{t_{cur}-t_{i}+\lambda -1}$$</p>
+<ul>
+<li>a là decay paremeter</li>
+<li>$t_{cur}$ là thời điểm hiện tại</li>
+<li>$\lambda$ là penalty term cho items vừa tới</li>
+</ul>
+<table border="1" align="center">
+<tr>
+<th>Thuật toán 3: TwSample: Randomized Time-Weighted Counting</th>
+</tr>
+<tr>
+<td><b>Input</b>: Stream S, k số k items được theo dõi, tham số decay $\alpha$ tỉ lệ
+tăng $\sigma$ của penalty term.<br> 1&#8195;&#8195;$\lambda \gets 1$;<br> 2&#8195;&#8195;K$\gets \emptyset$;<br> 3&#8195;&#8195;foreach item mới u từ S do
+<br> 4&#8195;&#8195;&#8195;&#8195;Downsampling($\alpha$);<br> 5&#8195;&#8195;&#8195;&#8195;if bernoulli($\alpha^{\lambda-1}$) = 1 then
+<br> 6&#8195;&#8195;&#8195;&#8195;&#8195;&#8195;if u $\in$ K then $c_{u} \gets c_{u} +1$;<br> 7&#8195;&#8195;&#8195;&#8195;&#8195;&#8195;else
+<br> 8&#8195;&#8195;&#8195;&#8195;&#8195;&#8195;&#8195;&#8195;K $\gets K\cup${u};<br> 9&#8195;&#8195;&#8195;&#8195;&#8195;&#8195;&#8195;&#8195;$c_{u} \gets 1$;
+<br> 10&#8195;&#8195;&#8195;&#8195;&#8195;&#8195;endif<br> 11&#8195;&#8195;&#8195;&#8195;&#8195;&#8195;while |K| < k do
+<br> 12&#8195;&#8195;&#8195;&#8195;&#8195;&#8195;&#8195;&#8195;$\lambda \gets \lambda + \sigma$;<br> 13&#8195;&#8195;&#8195;&#8195;&#8195;&#8195;&#8195;&#8195;Downsampking($\alpha^{\sigma}$);
+<br> 14&#8195;&#8195;&#8195;&#8195;&#8195;&#8195;endwhile<br> 15&#8195;&#8195;&#8195;&#8195;endif<br> 16&#8195;&#8195;endfor
+<br> 17&#8195;&#8195;Thủ tục Dowmsampling($\theta$)<br> 18&#8195;&#8195;foreach v $\in$ K với số đếm $c_{v}$ do
+<br> 19&#8195;&#8195;&#8195;&#8195;$c_{v} \gets binomial(c_{v},\theta)$;<br> 20&#8195;&#8195;&#8195;&#8195;if $c_{v}$ = 0 then
+<br> 21&#8195;&#8195;&#8195;&#8195;&#8195;&#8195;K $\gets$ K\{v};<br> 22&#8195;&#8195;&#8195;&#8195;endif<br> 23&#8195;&#8195;endfor
+</td>
+</tr>
+</table>
+<h4 align="center">Thuật toán 3: thuật toán TwSample[14]</h4>
+<p>Thuật toán TwSample là thuật toán dựa trên lấy mẫu (sampling based algorithm).
+Một chút về thuật toán dựa trên lấy mẫu, thuật toán sẽ xem những items trên 1 stream
+như là những mẫu thử (sample). Khi 1 item tới, thuật toán sẽ lấy mẫu (sample) item
+đó theo xác xuất. Nếu lấy mẫu thành công, item được ghi nhận là đã xuất hiện tại thời
+điểm đó. Nếu thật bại, bỏ luôn item đó và thuật toán không nhớ gì về sự xuất hiện của
+nó. Những item có độ phổ biến càng cao thì càng dễ được lấy mẫu và ngược lại. Cho
+một chuỗi các items cho đến thời điểm $t_{cur}$ là $u_{1},...,u_{t_{cur}}$ và $0<\alpha\leq 1$ và $\lambda \geq 1$, thuật
+toán TwSample lấy mẫu mỗi item u<sub>t</sub> với xác xuất $\alpha^{t_{cur}-t+\lambda -1}$. Khi λ càng tăng thì xác
+xuất lấy mẫu thành công càng giảm. Để duy trì việc theo dõi top-k frequent items chỉ
+với O(k) không gian bộ nhớ, khi số lượng item đang theo dõi vượt quá k thì thuật toán
+TwSample buộc phải loại bỏ đi những item ít xuất hiện nhất. Để làm được điều này,
+thuật toán TwSample chạy 1 thủ tục được gọi là downsampling. Thủ tục
+downsampling sẽ tiến hạnh lấy mẫu lại những items đã theo dõi dựa theo counter của
+item đó theo xác xuất $\alpha^{\sigma}$ và sẽ loại bỏ đi những item không xuất hiện lần nào tại lần
+lấy mẫu lại này.</p>
+<p>Một cách chi tiết, Thuật toàn TwSample yêu cầu 3 tham số: k là số items tối đa
+được theo dõi, time-weighting factor $\alpha$ và độ tăng $\sigma$ cho penalty term λ. Còn có 3
+loại thông tin được cập nhật tăng dần: penalty term λ, tập K của các items được theo
+dõi, và counter c<sub>v</sub> được liên kết với mỗi v $\in$ K. Khởi tạo, λ = 1 và K = ∅. Khi một
+item mới u tới, u được lấy mẫu với xác xuất $\alpha^{\lambda -1}$. Trong khi u được lấy mẫu thành
+công, nếu u ∈ k, counter c<sub>u</sub> được tăng thêm 1, ngược lại u được thêm vào tập K với
+counter cu =1. Sau khi lấy mẫu, Nếu |K| > k, λ được tăng 1 lượng $\sigma$ và thực hiện
+downsampling. Cụ thể cho downsampling, mỗi v $\in$ K, c<sub>v</sub> được cập nhật bởi 1 con số
+được trả về từ hàm xác xuất binomial($c_{v},\alpha^{\sigma}$). Nếu 𝑐 trờ thành 0, v được loại bỏ
+khỏi K. Quá trình này được lập lại cho tới khi |K| $\geq$ k. Cuối cùng, trước mỗi lần 1
+item mới tới thì TwSample sẽ downsampling tất cả item trong K trước khi xử lý item
+mới đó.</p>
+<p><b>Hiệu quả của $\sigma$</b>, Thực chất, $\sigma$ xác định tốc độ lấy mẫu cho việc loại bỏ những
+items đang theo dõi để mà số items trong K không vượt quá k. Khi $\sigma$ nhỏ, tổng lượng
+counter của các items giảm tại dòng 14, dẩn tới cần thời gian dài cho quá trình loại
+bỏ tại dòng 12-15. Độ chính xác có thể tăng vì không loại bỏ hơn yêu cầu. Mặt khác,
+khi $\sigma$ lớn, quá trình loại bỏ kết thúc nhanh, mặt dù độ chính xác có thể giảm vì ta có
+thể loại bỏ nhiều hơn một item.</p>
+<p>Lemma 1: Tại thời điểm tcur với penalty term λ , mỗi item u xảy ra tại thời điểm
+t $\leq$ t<sub>cur</sub> được lấy mẫu với xác xuất$$Pr(u \; được \; lấy \; mẫu) = \alpha^{t_{cur}-t+\lambda -1}$$</p>
+<p>Chứng minh: Cho u là item mới tại thời điểm t = 1 và t<sub>cur</sub> = 1. U được lấy mẫu
+với xác xuất $\alpha^{t_{cur}-t+\lambda -1}$ = 1.</p>
+<p>Cho t<sub>cur</sub> >=1. Giả sử lemma đúng cho thời điểm t<sub>cur</sub>. Điều này tương đương với
+cho mỗi u tại thời điểm t $\leq t_{cur}$, u được lấy mẫu với khả năng $\alpha^{t_{cur}-t+\lambda -1}$. Ta chứng
+minh lemma đúng tại thời điểm t<sub>next</sub> = t<sub>cur</sub> +1. Ờ dòng 4, tất cả mẫu thử được
+downsample với xác xuất $\alpha$. Điều này có nghĩa rằng sau dòng 4, những mẫu thử còn
+lại được lấy với xác xuất $\alpha^{t_{cur}-t+\lambda -1+1}$ mà trùng với xác xuất lấy mẫu tại thời điểm
+t<sub>next</sub> = t<sub>cur</sub> +1 của lemma 1.</p>
+<p>Tiếp theo, ta kiểm tra dòng 5 tới 11. Cho u là item mới tới tại thời điểm t = t<sub>next</sub>.
+Rõ ràng, u được lấy mẫu với xác xuất $\alpha^{t_{cur}-t+\lambda -1}$ = 1 bởi dòng 5, không quan
+tâm u có được theo dõi hay không. Ta sẽ kiểm tra downsampling. Coi d là số vòng
+lặp của cậu lệnh while tại dòng 12. Sau đó, sau khi downsampling, mỗi mẫu thử được
+lấy mẫu lại với xác xuất $\alpha^{d\sigma}$, và như vậy mỗi mẫu thử được lấy với xác xuất
+$\alpha^{t_{cur}-t+\lambda +d\sigma -1}$  mà trùng với xác xuất lấy mẫu tại thời điểm t<sub>next</sub> = t<sub>cur</sub>+1 của lemma
+1 với λ = λ + d𝜎.</p>
+<p>Lưu ý rằng khả năng lấy mẫu không tăng theo thời gian vì λ chỉ tăng chứ không
+giảm. Do đó, một item không được lấy mẫu tại thời điểm nào đó sẽ không được lấy
+mẫu trong tương lai. $\Box$</p>
+<p>Hệ luận bên dưới có được trực tiếp từ Lemma 1:</p>
+<p><b>Hệ luận 1</b>: Tại bất kì thời tcur nào trong TwSample, kì vọng của counter c<sub>u</sub> của
+item u được theo dõi u ∈ K là:$$E(c_{u}) = P(u) = \sum_{t\in T_{u}}\alpha^{t_{cur}-t+\lambda +1}$$</p>
+<p>Với T<sub>u</sub> là tập những thời điểm mà u xảy ra.</p>
+<p><b>Lemma 2</b>: Tại bất kì thời điểm nào, xác xuất pu với u là item được theo dõi thỏa
+mãn bất đẳng thức bên dưới:$$P(u) \geq 1 - exp(-P(u)/2)$$</p>
+<p>Chứng minh: Lưu ý rằng p<sub>u</sub>= Pr[c<sub>u</sub> >0] vì c<sub>u</sub> = $\sum_{i=1}^{|T_{u}|}c_{u}(i)$ là một biến ngẫu nhiên
+với cu(i) xác định sự xuất hiện thứ I của u có được lấy mẫu không. Áp dụng <b>Chernoff
+bound</b>, ta đạt được bất đẳng thức bên dưới: $$P_{u} = Pr[c_{u} > 0] = 1 – Pr[c_{u} = 0] >= 1 – exp(-E[c_{u}]/2)$$</p>
+<p>Vì E[cu] = P(u) bởi hệ luận 1, Lemma được chứng minh. $\Box$</p>
+<p>Lemma 2 phát biểu rằng 1 item là ít quan trọng hơn, khả năng nó không được
+theo dõi tăng theo hàm số mũ.</p>
+<p>Mặc dù TwSample là đơn giản và cung cấp một sự đảm bảo về lý thuyết cho kết
+quả của nó, nhưng hiệu năng của nó bị suy giảm vì tính chất của xác xuất. Đầu tiên,
+thời gian chạy trở nên chậm vì số vòng lặp cho downsampling với k tăng không cố
+định và thời gian cho việc lấy được biến ngẫu nhiên từ hàm binomial(c, θ) phụ thuộc
+vào c. Thứ hai, top k-items tìm được và counter c tương ứng có thể không chính xác
+vì λ lớn không thể kiểm soát. Sự không chính xác này có thể được giải quyết bằng
+duy trì s sessions độc lập mà mỗi session theo dõi k items, nhưng nó dẩn tới tốn nhiều
+không gian bộ nhớ và thời gian chạy. Trong mục tiếp theo, biến thể tất định của
+TwSample được đề xuất mà nó là nhanh và yêu cầu 1 session đơn của kích thước k.</p>
+<h3 class="subheader1">5.3.2. Thuật toán tất định TwMinSwap</h3>
+<p>Thuật toán TwMinSwap được đề xuất như là một phiên bản tất định
+(derterministic) của thuật toán TwSample. Thuật toán TwMinSwap khai thác 1 cách
+hiệu quả top-k time-weighted frequent items.</p>
+<table  border="1" align="center">
+<tr>
+<th>Thuật toán 4: TwMinSwap: Deterministic Time-Weighted Counting</th>
+</tr>
+<tr>
+<td><b>Input</b>: Stream S, k số items được theo dõi, tham số decay $\alpha$<br> 1&#8195;&#8195;K $\gets \emptyset$;
+<br> 2&#8195;&#8195;$t_{cur} \gets$ 0;<br> 3&#8195;&#8195;foreach item mới u từ S do<br> 4&#8195;&#8195;&#8195;&#8195;$t_{cur} \gets t_{cur} +1$;
+<br> 5&#8195;&#8195;&#8195;&#8195;foreach v $\in$ K do<br> 6&#8195;&#8195;&#8195;&#8195;&#8195;&#8195;$c_{v} \gets c_{v} x \alpha$;
+<br> 7&#8195;&#8195;&#8195;&#8195;endfor<br> 8&#8195;&#8195;&#8195;&#8195;if u $\in$ K then<br> 9&#8195;&#8195;&#8195;&#8195;&#8195;&#8195;$c_{u} \gets c_{u} +1$;
+<br> 10&#8195;&#8195;&#8195;&#8195;else if |K| < k then<br> 11&#8195;&#8195;&#8195;&#8195;&#8195;&#8195;K $\gets K \cup${u};
+<br> 12&#8195;&#8195;&#8195;&#8195;&#8195;&#8195;$c_{u} \gets 1$;<br> 13&#8195;&#8195;&#8195;&#8195;else<br> 14&#8195;&#8195;&#8195;&#8195;&#8195;&#8195;$v^{*} \gets argmin_{v \in K}c_{v}$
+<br> 15&#8195;&#8195;&#8195;&#8195;&#8195;&#8195;if $c_{v^{*}}$ < 1 then<br> 16&#8195;&#8195;&#8195;&#8195;&#8195;&#8195;&#8195;&#8195;K $\gets$ K\{v*}$\cup${u};
+<br> 17&#8195;&#8195;&#8195;&#8195;&#8195;&#8195;&#8195;&#8195;&#8195;&#8195;$c_{u} \gets 1$;<br> 18&#8195;&#8195;&#8195;&#8195;&#8195;&#8195;endif
+<br> 19&#8195;&#8195;&#8195;&#8195;endif<br> 20&#8195;&#8195;endfor
+</td>
+</tr>
+</table>
+<h4 align="center">Thuật toán 4: thuật toán TwMinSwap [14]</h4>
+<p>Ý tưởng chính là việc lưu trữ số kì vọng của mẫu thử cho mỗi item một cách trực
+tiếp thay vì áp dụng quá trình ngẫu nhiên. Cụ thể, cho 1 item u xảy ra tại thời điểm
+t$\leq t_{cur}$, thay vì tăng cu bởi 1 với xác xuất $\alpha^{t_{cur}-t}$, ta tăng c<sub>u</sub> bởi $\alpha^{t_{cur}-t}$ với xác xuất
+1. Sau đó, downsampling với tốc độ θ trở thành cv = cv θ, cho mỗi item được theo
+dõi v ∈ K. Tuy nhiên, đối với tình huống tất định này, ta gặp phải một vấn đề khi tất
+cả counters trở lên đầy. Cụ thể, vì số kì vọng cho item xuất hiện ít nhất một lần trên
+data stream không bao giờ trờ về 0, nó cần được cắt đi để loại bỏ item đang theo dõi
+mà không trọng bằng một item mới. Thuật toán TwMinSwap đề xuất một heuristic
+đơn giản cho việt cắt đi mà không yêu cầu thêm không gian bộ nhớ, dẩn tới sử dụng
+bộ nhớ thấp khi so sánh với các cách tiếp cận khác [5, 26, 27]. Lưu ý rằng phương
+thức cắt ở đây tương ứng với việc giảm tốc độ lấy mẫu bởi việc tăng λ trong
+TwSample.</p>
+<p>Chi tiết của heuristic cho việc cắt tỉa được bàn luận bên dưới. Cho K là một tập
+items hiện tại được theo dõi với |K| = k, và u là item vừa tới từ data stream. Phương
+thức cắt tỉa đầu tiên tìm một item v* ∈ K có time-weighted count tối thiểu $c_{v^{*}}$ = $min_{c\in K}c^{*}$
+Nếu c* < 1, ta bỏ $c_{v^{*}}$ và bắt đầu theo dõi u với count khởi tạo là 1; ngược
+lại, u được bỏ qua. Sự trao đổi giữa u và 𝑣 là hiểu được vì 1 là count của u khi mới
+vừa được khởi tạo và nếu $c_{v^{*}}\geq 1$ thì lúc này nếu u nằm trong K thì sẽ bị xóa vì c<sub>u</sub> là
+count thấp nhất trong K dẩn tới việc theo dõi u là không cần thiết; điều này giải thích
+tại sao u lại bị bỏ qua khi $c_{v^{*}}\geq 1$ và việc tráo đổi chỉ được thực hiện khi $c_{v^{*}}< 1$.</p>
+<p>Điểm mạnh của TwMinSwap tổng kết lại bên dưới. Đầu tiên, bộ nhớ mà nó sự
+dụng là nhỏ. Cho mỗi item, chỉ định danh (id) và time-weighted count của nó được
+duy trì. Thứ hai, TwMinSwap yêu cầu tham số tối thiểu: k và 𝛼 Điều này đặc biệt
+thuận lợi cho việc giảm nổ lực điều chỉnh tham số trong thực tế. Thứ ba, trái với
+TwSample, TwMinSwap đảm bảo output k items miển là N $\geq$ k.</p>
+<p>Thời gian xử lý mỗi item. Có hai phép toán tốn thời gian chạy là: (1) tìm item
+với count tối thiểu, và(2) nhân 𝐠với tất cả counters của tất cả items trong K. Cả 2
+phép toán điều tốn O(k) thời gian chạy. Vậy, TwMinSeap yêu cầu O(k) thời gian chạy
+cho mỗi vòng lặp.</p>
+<h3 class="subheader1">5.3.3. Phân tích thuật toán TwMinSwap</h3>
+<p>Ta sẽ phân tích TwMinSwap về điều kiện khi nào item được theo dõi không bị
+loại khỏi K. Một cách chính xác hơn, Lemma 3 và 4 phát biểu rằng TwMinSwap sẽ
+không loại bỏ những items mà số lần xuất hiện của nó trên một ngưỡng nào đó cho
+cả trường data chung chung và trường hợp phân phố lũy thừa.</p>
+<p>Lemma 3: Cho 0 < $\alpha$ ≤ 1 là tham số time-decay của TwMinSwap. Bất kì item
+với c $\geq$ 1 sẽ không bị loại bỏ khỏi K nếu nó xuất hiện ít nhất một lần mỗi 1-log<sub>α</sub>γ nơi
+γ = min {1+α,c}.</p>
+<p>Chứng minh: Giả sử v ∈ K với count $c_{v} = c \geq 1$ tại mốc thời gian t và nó xuất
+hiện một lần mỗi d thời gian. Ta định nghĩa hàm bên dưới:$$g(r+1) = (g(r)α + 1)α^{d-1}$$</p>
+<ul>
+<li>r là số lần mà v xuất hiện kể từ mốc thời gian t</li>
+<li>g(r) cho biết $c_{v}$ tại lần thứ r mà v xuất hiện từ mốc thời gian t. Cụ thể, g(1)
+= $cα^{d-1}$ và g(r) = $c_{v}$ sau rd-1 thời gian kể từ mốc thời gian t.</li>
+</ul>
+<p>Ta sẽ chứng minh g(r) $\geq$ 1 với d $\leq$ 1-log<sub>α</sub>γ với mỗi r $\leq$ 1 nơi γ = min {1+α,c}.
+Trường hợp r = 1, giả sử rằng c $\leq$ 1 + α, thì $$g(1) = c\alpha ^{d-1} \leq c\alpha ^{log_{\alpha}c}=1$$</p>
+<p>Giả sử rằng c > 1 + α thì$$g(1) = c \alpha^{d-1} \geq (1+\alpha)\alpha^{d-1} \geq (1+\alpha)\alpha^{log_{\alpha}(1+\alpha)}$$</p>
+<p>Trường hợp r > 1, giả sử rằng g(r-1) >=1 thì $$g(r) = (g(r-1)\alpha +1)\alpha^{d-1}\geq (\alpha+1)\alpha^{d-1} \geq min\{1+\alpha,c\}x \alpha^{1-log_{\alpha}min\{1+\alpha,c\}}$$</p>
+<p><b>Lemma 4</b>: Cho n là số items và phân phối của items là phân lũy thừa cơ số 2. Bất
+kì item được theo dõi $i \leq \sqrt{1-log_{\alpha}(1+\alpha)/1.7}$ với count $c_{i} \geq \alpha^{\big(1-1.7i^{2}\big)}$ được kì
+vọng là không bị loại bỏ.</p>
+<p>Chứng minh: Cho item i ∈ [1,n], khả năng mà nó xảy ra trên stream là $$Pr[i\;xảy\;ra] = i^{-2}/Z$$</p>
+<p>Nơi Z là normalization constant. Do đó, giá trị kì vọng của item xuất hiện trước
+i là $i^{2}Z$.</p>
+<p>Giả sử rằng c<sub>i</sub> ≤ α + 1. Bất đằng thức bên dưới đảm bảo kì vọng mà i sẽ không
+bị loại bỏ bởi Lemma 3: $$1 - log_{\alpha}c_{i} \geq i^{2}Z \Leftrightarrow 1-i^{2}Z \geq log_{\alpha}c_{i} \Leftrightarrow \alpha^{1-i^{2}Z} \leq c_{i} \Leftrightarrow \alpha^{1-i^{2}Z} \leq \alpha +1 \Leftrightarrow i \leq \sqrt{\frac{1-log_{\alpha}(1+\alpha)}{Z}} $$</p>
+<p>Gỉa sử $c_{i} >$ α + 1. Bất đằng thức bên dưới đảm bảo kì vọng mà i sẽ không bị loại
+bỏ bởi Lemma 3: $$1-log_{\alpha}(1+\alpha) \geq i^{2}Z \Leftrightarrow i \geq \sqrt{\frac{1-log_{\alpha}(1+\alpha)}{Z}}$$</p>
+<p>Cuối cùng, $Z \leq \sum_{j=1}^{\infty}j^{-2} = \frac{\pi^{2}}{6} $, chứng minh đã hoàn thành.</p>
+<h2><a name="5.4">5.4. Thí nghiệm</a></h2>
+<p>Ta trình bày kết quả thí nghiệm cho việc thể hiển hiệu năng của TwMinSwap
+được đề xuất với data stream phát sinh là synthetic data stream. Đặc biệt, ta muốn trả
+lời những câu hỏi bên dưới:</p>
+<p><b>Q1</b>: Có bao nhiêu top-k time weighted frequent items mà ta có thể khám phá?</p>
+<p><b>Q2</b>:Ta ước lượng time-weighted count của những items khám phá được chính
+xác như thế nào?</p>
+<p><b>Q3</b>: TwMinSwap chạy nhanh như thế nào?</p>
+<h3 class="subheader1">5.4.1 Cài đặt thuật toán</h3>
+<p>Ta xem xét 2 loại data stream được phát sinh từ luật phân phối lũy thừa để minh
+họa bursty item xảy ra nơi N là chiều dài của stream và n là số items phân biệt.</p>
+<p>Phân phối tĩnh: N items được phát sinh dựa theo luật phân phối lũy thừa bên
+dưới $$Pr[i\;được\;phát\;sinh]\propto i^{-\beta},\;với\;i\in[1,n]$$</p>
+<p>Phân phối động: cho 0 $\leq r \leq$ 1, rN items đầu tiên được phát sinh từ $$Pr[i\;được\;phát\;sinh]\propto i^{-\beta}$$</p>
+<p>và (1-r)N items cuối được phát sinh từ $$Pr[i\;được\;phát\;sinh]\propto (n-i+1)^{-\beta}$$</p>
+<p>Trong thí nghiệm của ta, β được thay đổi trong {0.5,0.75,1,1.25,1.5,1.75}; N =
+$10^{6}$, n = $10^{4}$, r = 0.8 và k = 50 là cố định. Ở đây, khi β cao hơn, sự phổ biến của item
+bị lệch nhiều hơn. Lưu ý rằng mặc dù chiều dài stream N là cố định trong thí nghiệm
+này, thời gian xử lý mỗi item và không gian xử lý của thuật không phụ thuộc vào N.</p>
+<p>Ta xem xét các thuật toán cạnh tranh khác, và trong thí nghiệm này, tất cả phương
+thức đều được cài đặt bằng java</p>
+<ul>
+<li><b>TwFreg</b> [28]: thuật toán dựa trên counter để tìm time-weighted frequent items
+từ data stream.</li>
+<li><b>TwHCount</b> [29]: thuật toán dựa trên sketch để tìm time-weighted frequent
+items từ data stream.</li>
+<li><b>SpaceSaving</b> [23]: thuật toán dựa trên counter để tìm frequent items từ data
+stream. Vì thuật toán này không tìm time-weighted items, ta so sánh thuật toán
+này với những thuật toán khác chỉ với phương diện recall và precision.</li>
+</ul>
+<p>Yêu cầu của tất cả thuật toán như bên dưới. TwMinSwap, TwFreg và SaceSaving
+yêu cầu O(k) không gian bộ nhớ. TwSample yêu cầu O(sk) với s là số session song
+song phục vụ cho mục đích lấy mẫu độc lập. TwHCount yêu cầu O(k+rm) nơi r là số
+lượng hash functions và m là phạm vi kích thước của hash function.</p>
+<p>Tham số cho thuật toán TwSample là s = 10 và 𝐠= 0.0001. Tham số cho thuật
+toán TwHcount, sử dụng tham số từ paper gốc [], và thiết lập kích thước table rm tới
+1% và 10% của n.</p>
+<img src="./images/FIG05-01.jpg"/>
+<h4 align="center"><a name="fig05-01">Hình 5-1: So sánh giữa các thuật toán về Precision và Recall [14]</a></h4>
+<h3 class="subheader1">5.4.2. Khám phá Top-k time-weighted frequent items</h3>
+<p>Hình 5-1 thể hiện sự chính xác của items được khám phá theo khía cạnh precision
+và recall. Một cách tổng thể, thuật toán TwMinSwap thực hiện tốt hơn các thuật toán
+khác bất chấp loại phân phối item và giá trị mũ β. Precision và recall của nó luôn gần
+bằng 1. TwSample(10) cái thiện được precision và recall khi β cao hơn nói chung. Lý
+do tại sao recall của TwSample(10) là thấp cho β = 1.75 là do lượng lớn mật độ xác
+xuất dày đặt được gán cho chỉ một ít items khi β lớn hơn, dẩn đến chỉ một số nhỏ $\bar{k}$ < k
+được khai thác. Số chính xác là 33 và 36 lần lượt cho phân phối tĩnh và phân phối
+động. Cho TwHCount, luôn luôn $\bar{k}$ = 50, và cho TwFreg, luôn luôn $\bar{k}$ ≥ 49.</p>
+<p>TwFreg trình bày pattern tương tự như TwSample(10) nhưng hiệu năng thấp hơn
+TwSample(10). TwHCount có kết quả cao ở precision và recall bất chấp kích thước
+của table nhưng vẩn thấp hơn TwMinSwap. Space Saving thực hiện khá tốt cho phân
+phối item tĩnh: cả hai precision và recall trung bình 0.9. Tuy nhiên, vì SpaceSaving
+không xem xét time-weighting factor, cho phân phối item động hiệu năng của nó tụt
+giảm khi β lớn.</p>
+<img src="./images/FIG05-02.jpg"/>
+<h4 align="center"><a name="fig05-02">Hình 5-2: So sánh giữa các thuật toán về Time-weighted count [14]</a></h4>
+<h3 class="subheader1">5.4.3. Ước lượng Time-weighted Count</h3>
+<p>Hình 5-6 thể hiện ước lượng time-weighted count của top-k items được khám phá
+cho từng thuật toán. Đặc biệt, TwMinSwap ước lượng rất chính xác, mà được thể
+hiện bởi đường thẳng màu xanh dương (hầu như đè lên màu xanh lá cây).</p>
+<p>Vì TwFreg cung cấp 1 lower bound và upper bound của true time-weighted count
+của top-k items được khám phá, ta chọn trung bình của 2 bound. Nói chung, khi rank
+của items dần thấp hơn, sự chính xác bị sụt giảm. Một lý do của ước lượng nghèo nàn
+của TwFreg cho item có rank thấp vì TwFreg được phát triển đầu tiên để tìm frequent
+items mà có time-weighted count lớn hơn một ngưỡng nào đó hơn tìm top-k items
+mặc dù nó duy trì cao nhất k items. TwSample(10) thể hiện hiệu năng tốt thứ ba, và
+ước lượng time-weighted count chính xác hơn khi β lớn tương đối. Hiệu năng trung
+bình tốt hơn TwFreg, nhưng TwSample(10) không bị tụt giảm tụt giảm đối với những
+items có rank thấp. Hiệu năng của TwHCount phụ thuộc nhiều vào kích thước của
+hash table rm. Ước lượng kết quả TwHCount(1) có lỗi rất lớn trong khi
+TwHCount(10) là tương đương với TwMinSwap</p>
+<img src="./images/FIG05-03.jpg"/>
+<h4 align="center"><a name="05-03">Hình 5-3: So sánh giữa các thuật toán về Running-time [14]</a></h4>
+<h3 class="subheader1">5.4.1. Thời gian thực thi</h3>
+<p>Hình 5-7 thể hiện thời gian chạy của thuật toán cho xử lý tất cả items trên data
+stream. Xu hướng chung là thời gian chạy giảm khi β tăng. Khi β tăng, xác xuất một
+item mới tới là item đang theo dõi tăng, dẩn tới không thường xuyên gọi tới bước loại
+bỏ nhưng là DownSampling trong TwSample.</p>
+<p>TwSample(10) thể hiện thời thời gian chạy thấp vì thực hiện 10 session lấy mẫu
+độc lập. Mặc dù TwFreg có cùng thời gian xử lý mỗi item như TwMinSwap trong
+khái niệm Big-O, TwFreg gọi nhiều phép tính cho bước loại bỏ hơn TwMinSwap.
+TwFreg cập nhật nhiều biến hơn và duyệt items được theo dõi hai lần trong
+TwMinSwap chỉ duyệt chúng một lần. Kết quả đạt được cho thấy TwFreg thay đổi
+nhiều trong thực tế hơn TwMinSwap.</p>
+<p>Vì TwHCount có OI thời gian xử lý mỗi item, nó chạy nhanh nhất. Thật sự, thời
+gian chạy nhanh có được bởi duy trì một hash table với kích thước rm cho việc xấp
+xỉ time-weighted count, dẩn tới sử dụng bộ nhớ nhiều hơn TwMinSwap. Mặc dù thời
+gian chạy của TwHCount không phụ thuộc vào m, nhưng để đảm bảo error của ước
+lượng time-weighted count thấp, rm nên lớn như được thể hiện trong hình 5-6.</p>
+<h2><a name="5.5">5.5. Vận dụng</a></h2>
+<p>Trong mục này, chúng tôi sẽ trình bày cách mà thuật toán TwMinSwap được tích
+hợp như thế nào trong hệ thống phân tích Data Stream mà chúng tôi đang xây dựng.
+Hình 5-4 cho biết interface mà hệ thống cung cấp cho một thuật toán để tích hợp vào
+hệ thống.</p>
+<img src="./images/FIG05-04.jpg"/>
+<h4 align="center">Hình 5-4: Lớp interface tích hợp thuật toán</h4>
+<p>Theo interface FrequentPattern sẽ có function mà thuật toán cần implement cho
+lớp TwMinSwap:</p>
+<ul>
+<li><b>setParameters</b>: là nơi thiết lập tham số cho thuật toán. Vì thuật toán yêu
+cầu 2 tham số là time decay $\alpha$, 0 < $\alpha$ ≤ 1 và k, k > 0 cho biết số lượng
+frequent item muốn khai thác, Input của function kiểu String có dạng
+“k,$\alpha$".</li>
+<li><b>Run</b>: là nơi chạy thuật toán xử lý cho mỗi item tới. Thuật toán được cài
+đặt trong function này. Input của function là item tới thường là idItem có
+kiểu String.</li>
+<li><b>getResults</b>: là nơi lấy kết quả của thuật toán. Thuật toán trả về kiểu String
+có định dạng JSon trong đó có danh sách k phần tử là phần tử phổ biến
+kèm theo tham số cho biết độ phổ biến của nó.</li>
+</ul>
+<p>Lớp TwMinSwap sẽ được tích hợp vào hệ thống và hoạt động như là thành
+phần lõi chuyên xử lý dữ liệu của hệ thống. Kết quả chuổi Json được lưu vào
+Redis Cluster (Chương 3) và phân tán cho người dùng.</p>
+<h2><a name="5.6">5.6. Tổng kết</a></h2>
+<p>Trong chương này, chúng ta đã bàn luận về một thuật toán khai thác frequent
+items TwMinSwap trên data stream hiệu quả ở khía cạnh tốc độ xử lý, tính chính xác
+và sử dụng bộ nhớ. Thuật toán TwMinSwap được truyền cảm hứng bởi thuật toán xác
+xuất TwSample mà có một sự đảm bảo tốt về lý thuyết. Cà hai đều yêu cầu O(k)
+không gian bộ nhớ với k là số lượng items ta đang theo dõi. Dù thuật toán TwSample
+gặp khó khăn vì đặc điểm tự nhiên của xác xuất ảnh hưởng hiệu năng của thuật toán.
+Ngược lại, thuật toán TwMinSwap lại cho thấy hiệu năng tốt hơn hẳn không chỉ
+TwSample mà còn đối với các đối thủ cạnh tranh khác. Bên cạnh thuật toán
+TwMinSwap, chúng tôi đã trình bày cách tích hợp thuật toán vào hệ thống phân tích
+Data Stream.</p>
+</body>
+</html>

@@ -1,0 +1,47 @@
+<html>
+<head>
+<meta charset="UTF-8">
+<link rel="stylesheet" type="text/css" href=".\thesis.css">
+<script type="text/x-mathjax-config">
+  MathJax.Hub.Config({tex2jax: {inlineMath: [['$','$'], ['\\(','\\)']]}});
+</script>
+<script type="text/javascript"
+  src="http://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML">
+</script>
+</head>
+<body>
+<h1>CHƯƠNG 8:	KẾT QUẢ VÀ HƯỚNG PHÁT TRIỂN</h1>
+<p>Trong chương này, chúng tôi sẽ trình bày về kết quả đạt được của khóa luận, và hướng phát triển trong tương lại của hệ thống cũng như việc tích hợp thêm thuật toán vào hệ thống. Chương này còn chỉ ra một số hạn chế của hệ thống và thuật toán tích hợp.</p>
+<h3>Các mục chính trong chương:</h3>
+<p><a href="#8.1">8.1.	Kết quả khóa luận</a></p>
+<p><a href="#8.2">8.2.	Hướng phát triển</a></p>
+<h2><a name="8.1">8.1.	Kết quả khóa luận</a></h2>
+<h3 class="subheader1">8.1.1.	Kết quả thu được từ để tại khóa luận</h3>
+<ul>
+<li>Hệ thống chưa đề cập tới việc lưu trữ toàn bộ Data Stream vào các kho dữ liệu để thực hiện việc khai thác sau này khi cần. Vấn đề đặt ra ở đây là quá trình ETL thường lâu hơn nhiều so với tốc độ xử lý của Storm.</li>
+<li>Hệ thống hiện tại chỉ thực hiện khai thác trực tiếp trên Data Stream, chưa đề cập tới việc áp dụng những thuật toán máy học.</li>
+<li>Thuật toán được tích hợp vào hệ thống chưa có khả năng sử lý song song trên nhiều workers khác nhau, điều này gây hạn chế về hiệu năng toàn hệ thống trong trường hợp ta cần phát triển hệ thống lơn hơn, điểu này sẽ là một vấn đề lớn.</li>
+<li>Mặc dù Storm có hổ trợ Storm UI để giám sát Storm, tuy nhiên đây chỉ là một ứng dụng, nó chỉ có thể giám sát các ứng dụng chạy trong Storm cluster. Còn để giám sát về hiệu năng toàn hệ thống và các nodes con của cluster thì cần một hệ thống khác hổ trợ làm việc này.</li>
+<li>Thuật toán khai thác tập itemset phổ biến, tuy giải quyết được bài toàn Bursty hiệu quả, nhưng bù lại tốc độ xử lý không cao.</li>
+</ul>
+<h3 class="subheader1">8.1.2.	Một số hạn chế của khóa luận</h3>
+<ul>
+<li>Hệ thống chưa đề cập tới việc lưu trữ toàn bộ Data Stream vào các kho dữ liệu để thực hiện việc khai thác sau này khi cần. Vấn đề đặt ra ở đây là quá trình ETL thường lâu hơn nhiều so với tốc độ xử lý của Storm.</li>
+<li>Hệ thống hiện tại chỉ thực hiện khai thác trực tiếp trên Data Stream, chưa đề cập tới việc áp dụng những thuật toán máy học.</li>
+<li>Thuật toán được tích hợp vào hệ thống chưa có khả năng sử lý song song trên nhiều workers khác nhau, điều này gây hạn chế về hiệu năng toàn hệ thống trong trường hợp ta cần phát triển hệ thống lơn hơn, điểu này sẽ là một vấn đề lớn.</li>
+<li>Mặc dù Storm có hổ trợ Storm UI để giám sát Storm, tuy nhiên đây chỉ là một ứng dụng, nó chỉ có thể giám sát các ứng dụng chạy trong Storm cluster. Còn để giám sát về hiệu năng toàn hệ thống và các nodes con của cluster thì cần một hệ thống khác hổ trợ làm việc này.</li>
+<li>Thuật toán khai thác tập itemset phổ biến, tuy giải quyết được bài toàn Bursty hiệu quả, nhưng bù lại tốc độ xử lý không cao.</li>
+</ul>
+<h2><a name="8.2">8.2.	Hướng phát triển</h2>
+<h3 class="subheader1">8.2.1.	Hướng phát triển hệ thống</h3>
+<ul>
+<li>Trong tương lại, hệ thống cần cải thiện hơn về khả năng áp dụng những thuật toán về máy học, nhờ vào bộ thư viện TridentML và cơ chế truy vấn trực tuyến trên Data Stream của Storm là DRPC.</li>
+<li>Hệ thống nên cân nhắc tới việc tích hợp thêm thành phần giám sát hệ thống (Monitoring System) để có thể thực hiện cảnh báo, và hiển thị thông tin từng server một cách chi tiết hơn, một trong những hệ thống nổi bật là Ganglia.</li>
+<li>Việc lưu trữ toàn bộ Data Stream vào kho dữ liệu thương không đảm bảo hiệu năng do quá trình ETL mất quá nhiều thời gian. Để làm được việc này hệ thống cần nâng cấp khả năng lưu trữ dữ liệu lớn như là hệ thống lưu trữ phân tán HDFS của Hadoop.</li>
+</ul>
+<h3 class="subheader1">8.2.2.	Hướng phát triển thuật toán</h3>
+<ul>
+<li>Trong tương lai, chúng tôi sẽ tiếp tục tìm hiểu thêm một số thuật toán về những hướng khác như là clustering, classification để tích hợp vào hệ thống.<li>Hệ thống nên cân nhắc tới việc tích hợp thêm thành phần giám sát hệ thống (Monitoring System) để có thể thực hiện cảnh báo, và hiển thị thông tin từng server một cách chi tiết hơn, một trong những hệ thống nổi bật là Ganglia.</li>
+<li>Nâng cấp thuật toán TwMinSwap để nó có khả năng xử lý song song, nhằm giải quyết những hạn chế về hiệu năng của hệ thống khi tích hợp TwMinSwap.</li></ul>
+</body>
+</html>

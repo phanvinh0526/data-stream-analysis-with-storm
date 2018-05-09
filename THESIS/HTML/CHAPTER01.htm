@@ -1,0 +1,86 @@
+<html>
+<head>
+<meta charset="UTF-8">
+<link rel="stylesheet" type="text/css" href=".\thesis.css">
+<script type="text/x-mathjax-config">
+  MathJax.Hub.Config({tex2jax: {inlineMath: [['$','$'], ['\\(','\\)']]}});
+</script>
+<script type="text/javascript"
+  src="http://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML">
+</script>
+</head>
+<body>
+<h1>CHƯƠNG 1: GIỚI THIỆU</h1>
+<p class="abstract">Trong chương này, chúng tôi sẽ giới thiệu tổng quan cho toàn khóa luận, ý nghĩa thực tiễn và khoa học của việc nghiên cứu này. Một số vấn đề và thách thức đặt ra trong việc xây dựng một hệ thống khai thác Data Stream , và một số giải pháp được trình bày để giải quyết những vấn đề trên. Phần cuối chương sẽ giới thiệu tổng quan về bố cục của luận văn.
+</p>
+<h3>Các mục chính trong chương:</h3>
+<p><a href="#1.1">1.1.	Động lực nghiên cứu</a></p>
+<p><a href="#1.2">1.2.	Phát biểu bài toán</a></p>
+<p><a href="#1.3">1.3.	Đóng góp của khóa luận</a></p>
+<p><a href="#1.4">1.4.	Bố cục của luận văn</a></p>
+<h2><a name="1.1">1.1.	Động lực nghiên cứu</a></h2>
+<p>&#9733 <b> Ý nghĩa thực tiễn</b></p>
+<p>Việc khai thác thông tin hữu ích trực tiếp từ các Data Stream ngày càng được sự quan tâm nhiều. Việc khai thác thông tin từ Data Stream trở nên cấp thiết, bởi vì khả năng cung cấp nhanh nhất những xu hướng, các thay đổi trong cộng đồng mạng. Nhiều frameworks đã ra đời nhằm giúp việc khai thác thông tin trên Data Stream được dễ dàng và hiệu quả hơn. Tuy nhiên, chúng ta cũng cần một mô hình kiến trúc hệ thống vững chắc và liên kết chặt chẽ các thành phần với nhau, để hình thành lên một hệ thống mạnh mẽ trong xử lý và linh động trong việc nâng cấp và triển khai.</p>
+<p>&#9733 <b> Ý nghĩa khoa học</b></p>
+<p>Trong thực tế, có nhiều loại dữ liệu khác nhau như dữ liệu Text, Graph, Spatial,…, tuy nhiên nổi bật và đang được sự quan tâm nhiều trong cộng động khoa học trong những năm gần đây là loại dữ liệu Data Stream [4]. Trong đó việc khai thác tập mẫu phổ biến (frequent patterns mining) trên Data Stream thì nổi bật hơn về lượng ứng dụng rộng rãi và được cộng đồng khoa học chú ý nhiều [4]. Có nhiều thuật toán và phương pháp đã được đề xuất nhằm giải quyết các vấn đề trong việc khai thác loại dữ liệu này, trong số đó việc khai thác item phổ biến và itemset phổ biến là hai vấn đề đang được quan tâm hơn cả.</p>
+<p>Từ những ý nghĩa thực tiễn và ý nghĩa khoa học đó đã làm cơ sở và động lực chính để thúc đẩy các thành viên trong nhóm khảo sát, phân tích và thiết kế hệ thống khai thác Data Stream, cùng với việc xây dựng một bộ thư viện để tích hợp các thuật toán mới về khai thác mẫu phổ biến trên Data Stream vào hệ thống. Hai thuật toán [2] [3] là một minh chứng cho việc vận dụng bộ thư viện tích hợp này.</p>
+<h2><a name="1.2">1.2.	Phát biểu bài toán</a></h2>
+<p>Việc khai thác dữ liệu trên Data Stream đặt ra nhiều khó khăn và thách thức, những khó khăn này chủ yếu tập trung tại 2 thành phần là hệ thống xử lý Data Stream, và những thuật toán khai thác loại dữ liệu này [5].</p>
+<h3 class="subheader1">1.2.1.	Hệ thống phân tích Data Stream</h3>
+<p>&#9733 <b> Vấn đề trong việc xử lý dữ liệu lớn thời gian thực</b></p>
+<p>Thời kỳ đầu, các nhà phát triển thông thường phải xây dựng một mạng lưới các queues và workers để khai thác Data Stream.
+Tuy nhiên, điều này gặp một số hạn chế sau [6]: </p>
+<ul>
+<li><b>Tedious</b>: việc tiêu tốn thời gian và chi phí đầu tư để phát triển hệ thống xử lý dữ liệu real-time. Đòi hỏi nguồn nhân lực để quản trị và phát triển</li>
+<li><b>Brittle</b>: hạn chế tính logic, và khả năng chịu lỗi của hệ thống</li>
+<li><b>Painful to scale</b>: trong vài trường hợp lượng dữ liệu truyền cho một worker hay queue quá nhiều cần tới việc xử lý phân tán dữ liệu. Việc cấu hình phân chia công việc cho những workers khác sẽ gặp nhiều khó khăn.</li>
+</ul>
+<p>Trong những năm sau đó, với việc phát minh ra công nghệ xử lý và lưu trữ dữ liệu lớn phân tán Hadoop [7], nó giúp việc xử lý dữ liệu lớn thông qua nhiều máy dễ dàng hơn. Tuy nhiên, hệ thống batch system này xử lý dữ liệu với độ trễ cao vì chi phí thời gian khởi động và shutdown [1]. </p>
+<p style="border-style: solid;border-width: 1px;">Dựa trên những khảo sát và so sánh giữa nhiều framework mới hiện nay, nhóm đã chọn Apache Storm là thành phần xử lý dữ liệu thời gian thực và có khả năng giải quyết những vấn đề nếu trên, chi tiết được trình bày trong chương 2, và 3.</p>
+<p>&#9733 <b> Vấn đề trong việc giao cộng tác và tiếp giữa nhiều server với nhau</b></p>
+<p>Việc xử lý song song giữa nhiều server khác nhau trong thời kỳ đầu gặp rất nhiều vấn đề cần giải quyết, một trong số đó đã được đề cặp trong tài liệu [1]:</p>
+<ul>
+<li><b>Unreliable network</b>: vấn đề về việc mất kết nối giữa một hay nhiều server bởi nhiều nguyên nhân khác nhau</li>
+<li><b>Clock synchronization</b>: vấn đề về sự bất đồng bộ thời gian giữa nhiều server khác nhau</li>
+</ul>
+<p style="border-style: solid;border-width: 1px;">Vì vậy, ta cần có một hệ thống để giải quyết những vấn để được đề cập bên trên. Apache Zookeeper là một trong những framework nổi tiếng hiện nay với khả năng hổ trợ việc giao tiếp, và sử lý song song giữa nhiều server. Chi tiết về mô hình triển khai được trình bày trong chương 3.</p>
+<p>&#9733 <b> Vấn đề trong việc quản lý dòng dữ liệu lớn real-time</b></p>
+<p>Data Stream là một loại dữ liệu đến từ nhiều nguồn khác nhau với cường độ cao. Vì thế việc thu thập loại dữ liệu này, và phân tán nó cho nhiều ứng dụng xử lý khác nhau đặt ra một số khó khăn [8]. Chính vì lẽ đó, ta cần một hệ thống có thể thực hiện được những việc sau</p>
+<ul>
+<li>Thu thập dữ liệu từ nhiều nguồn dữ liệu khác nhau</li>
+<li>Phân tán dòng dữ liệu này với cường độ cao cho nhiều các ứng dụng khác nhau trong nội bộ hệ thống</li>
+<li>Có khả năng sao lưu phục hồi dữ liệu bị mất trong quá trình xử lý</li>
+</ul>
+<p style="border-style: solid;border-width: 1px;">Để quản lý dòng hiệu quả, nhóm đã ứng dụng hệ thống Apache Kafka, và được thiết kế theo một cách logic, sao cho nó có thể hoạt động được với công suất tối đa. Chi tiết thiết kế được trình bày trong chương 3.</p>
+<p>&#9733 <b> Vấn đề về lưu trữ và đồng nhất dữ liệu phân tán</b></p>
+<p>Kết quả của quá trình xử lý dữ liệu phải được lưu trữ lại, để phân tán cho người dùng cuối, hoặc xử dụng cho những mục đích khai thác sau này. Tuy nhiên, trong hệ thống phân tán, dữ liệu được xử lý trên nhiều nodes khác nhau, và việc lưu trữ chúng thường được đổ về một nơi để lưu trữ. Điều này làm giảm hiệu năng của hệ thống, vì hải nguyên nhân chính như sau:</p>
+<p>Việc lưu trữ bên ngoài sẽ làm tốn chi phí thời gian truyền tải dữ liệu</p>
+<p>Ta cần một cơ sở dữ liệu có khả năng đọc ghi nhanh, và vẫn có thế lưu trữ dữ liệu bền vững.</p>
+<p style="border-style: solid;border-width: 1px;">Để có thể lưu trữ dữ liệu với tốc độ cao, và vẫn đảm bảo sự nhất quán dữ liệu, cũng như giảm chi phí truyền tải dữ liệu ra các databases bên ngoài. Nhóm đã cài đặt RedisDB trên các server xử lý, và áp dụng một công nghệ rất mới để đảm bảo tính nhất quán về dữ liệu giữa các databases này là Redis Cluster. Chi tiết thiết kế được trình bày trong chương 3.</p>
+<h3 class="subheader1>">1.2.2.	Việc khai thác mẫu phổ biến trên Data Stream</h3>
+<p>Việc khai thác mẫu phổ biến trên Data Stream đặt ra 3 thách thức lớn [4]:</p>
+<ul>
+<li>Việc xử lý truy vấn trên Data Stream yêu cầu một lượng bộ nhớ rất lớn và không thể dự đoán được (1).</li>
+<li>Số lượng mẫu phát sinh tăng theo cấp số nhân, đòi hỏi phải có một giải thuật mới để khai thác như là việc tính toán xấp xỉ. (2)</li>
+<li>Tốc độ dữ liệu truyền vào nhanh hơn tốc độ xử lý của hệ thống trong một vài trường hợp gây quá tải hệ thống (3). </li>
+</ul>
+<p>Để giải quyết những vấn đề trên, trong việc khai thác mẫu phổ biến trên Data Stream, chúng tôi đã vận dụng 2 thuật toán mới và được đánh giá cao [2] [3] để tích hợp vào hệ thống.</p>
+<p style="border-style: solid;border-width: 1px;">Để giải quyết vấn đề (1) về lượng bộ nhớ tiêu thụ khi khác thác tập phổ biến, chúng tôi ứng dụng thuật toán [2] tính sấp xỉ, chi tiết được trình bày trong chương 5.
+Bài toán về Bursty tập ứng viên, trong trường hợp độ đài của một giao tác (transaction) vượt ngưỡng cho phép của hệ thống. Chúng tôi, đã khảo sát và cài đặt thuật toán [3] để giải quyết vần đề (2). Chi tiết được trình bày trong chương 6.
+</p>
+<p style="border-style: solid;border-width: 1px;">Trong vấn đề số (3) về việc Bursty lượng dữ liệu đổ về hệ thống, chúng tôi sử dụng Apache Kafka là nơi chứa dữ liệu tạm trong trường hợp bùng nổ dữ liệu. Chi tiết về việc thiết kế Kafka được đề cập trong chương 3.</p>
+<h2><a name="1.3">1.3.	Đóng góp của khóa luận</a></h2>
+<p>Những đóng góp của chúng tôi có thể được trình bày như sau:</p>
+<ul>
+<li>Chúng tôi đã đề xuất một mẫu kiến trúc khai thác Data Stream. Mẫu kiến trúc này được dựa trên bộ khung tổng quan về 5 thành phần của một Streaming System được giới thiệu trong tài liệu [1]. Tuy nhiên, tác giả không đề cập tới việc kết hợp chúng như thế nào để thành một hệ thống hoàn chỉnh và hoạt động hiệu quả. Hơn thế nữa, chúng tôi còn tích hợp thêm một thành phần để hệ thống hoạt động tốt nhanh hơn. </li>
+<li>Nghiên cứu 2 thuật toán mới [2] [3] về khai thác tập item phổ biến và itemset phổ biến. Những paper mới này được đánh ranking cao trên KDD . Chúng tôi đã cài đặt và tích hợp chúng vào hệ thống đã thiết kế nhằm giải quyết hai bài toán về Top-K mẫu phổ biến và Bursty tập ứng viên.</li>
+<li>Chúng tôi đã xây dựng thành công một bộ thư viện trong việc tích hợp những thuật toán mới về khai thác mẫu phổ biến trên Data Stream vào trong hệ thống.</p>
+<li>Về thực nghiệm, chúng tôi đã triển khai thành công hệ thống khai thác Data Stream dựa vào mô hình đã đề xuất trong chương 3. Bên cạnh đó, thực nghiệm còn trình bày thử nghiệm về đo hiệu năng của hệ thống sau khi tích hợp thuật toán, thử nghiệm này nhằm dự đoán ngưỡng chịu tải tối đa mà hệ thống vẫn hoạt động bình thường.</li>
+</ul>
+<h2><a name="1.4">1.4.	Bố cục của luận văn</a></h2>
+<p>Khóa luận bao gồm 8 chương chính. Chương 1 là phần giới thiệu tổng quan của toàn khóa luận, về động lực nghiên cứu, vấn để gặp phải và những đóng góp thực tiễn. Chương 2 và 3 sẽ trình bày về bộ khung tổng quan và mẫu thiết kế hệ thống khai thác Data Stream. Chương 4, 5, 6 sẽ trình bày hướng tiếp cận bài toán khai thác mẫu phổ biến của khóa luận và 2 thuật toán mới trong khía cạnh này. Chương 7 sẽ trình bày về phần thực nghiệm việc tích hợp thuật toán vào trong hệ thống và đo lường hiệu năng của toàn hệ thống. Chương cuối cùng là tổng kết và hướng phát triển của khóa luận. Hình 1-1 bên dưới mô tả sơ đồ các chương và hướng tiếp cận.</p>
+<img src="./images/FIG01-01.jpg"/>
+<h4 align="center"><a name="fig01-01">Hình 1-1: Sơ đồ kiến trúc khóa luận</a></h4>
+<p>Khóa luận được viết để mà ta có thể tiếp cận theo 2 hướng khác nhau, nếu mục tiêu của ta mún tìm hiểu về hệ thống khai thác Data Stream thì nên theo nhánh (1). Trong đó, chúng tôi sẽ trình bày về những khái niệm cơ bản của một Streaming System trong chương 2, và chương 3 sẽ là mô hình thiết kế hệ thống mà chúng tôi đã đề xuất. Một hướng tiếp cận khác là tìm hiểu về 2 thuật toán khai thác mẫu phổ biến hiện đại và cách tích hợp nó vào hệ thống, ta có thể theo nhánh (2).</p>
+</body>
+</html>

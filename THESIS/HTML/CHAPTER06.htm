@@ -1,0 +1,469 @@
+<html>
+<head>
+<meta charset="UTF-8">
+<link rel="stylesheet" type="text/css" href=".\thesis.css">
+<script type="text/x-mathjax-config">
+  MathJax.Hub.Config({tex2jax: {inlineMath: [['$','$'], ['\\(','\\)']]}});
+</script>
+<script type="text/javascript"
+  src="http://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML">
+</script>
+</head>
+<body>
+<h1>CHƯƠNG 6: PHƯƠNG PHÁP KHAI THÁC FREQUENT ITEMSETS TRÊN DATA STREAM</h1>
+<p class="abstract">Trong chương này, chúng tôi sẽ trình bày thuật toán khai thác frequent itemset
+trên data stream là Skip LC-SS. Thuật toán này được lựa chọn từ một tạp chí khoa
+học uy tín ACM SIGMOD xuất bản vào năm 2014. Thuật toán Skip LC-SS chỉ yêu
+cầu O(k) không gian bộ nhớ với k là hằng số và thời gian xử lý mỗi giao dịch là O(kL)
+dù có xảy ra bursty data stream. Cuối cùng, chúng tôi sẽ trình bày cách mà thuật toán
+Skip LC-SS được triển khai vào hệ thống thời gian thực mà chúng tôi đang xây dựng
+như thế nào.</p>
+<h3>Các mục chính trong chương:</h3>
+<p><a href="#6.1">6.1. Giới thiệu</a></p>
+<p><a href="#6.2">6.2. Một số nghiên cứu trước đây</a></p>
+<p><a href="#6.3">6.3. Các khái niệm và ký hiệu</a></p>
+<p><a href="#6.4">6.4. Hướng tham số và hướng tài nguyên</a></p>
+<p><a href="#6.5">6.5. Kết hợp thuật toán Lossy Counting và Space Saving</a></p>
+<p><a href="#6.6">6.6. Thuật toán skip LC-SS</a></p>
+<p><a href="#6.7">6.7. Cải tiến thuật toán skip LC-SS</a></p>
+<p><a href="#6.8">6.8. Vận dụng</a></p>
+<p><a href="#6.9">6.9. Tổng kết</a></p>
+<h2><a name="6.1">6.1. Giới thiệu</a></h2>
+<p>Ngày nay, khai thác frequent itemsets trên data stream (FIM-DS) là lĩnh vực thu
+hút nhiều sự chú ý của nhà khoa học vì thách thức cũng như ứng dụng của nó. Đã có
+một mảng rộng lớn các ứng dụng sử dụng FIM-DS như là hệ thống giám sát, mạng
+lưới giao tiếp, và giao thông mạng cũng như những transaction on-line trong thị
+trường tài chính, công nghiệp bán lẻ và mạng lưới điện.</p>
+<p><b>Bursty data stream</b>: hiện tượng chiều dài L của một hoặc nhiều transaction
+trong data stream đột ngột tăng rất cao, vượt quá kiểm soát. Hiện tượng này có thể
+xảy ra trong thực tế, ví dụ như đối với dữ liệu thời tiết tại nơi xảy ra thảm họa lớn
+(như động đất hay lốc xoáy) hay giao thông mạng khi có tấn DOS xảy ra … thì lượng
+dữ liệu đổ về sẽ rất nhiều và chứa rất nhiều thông tin. Bursty data stream làm bùng
+nổ số tổ hợp của của itemset, dẩn tới tràn bộ nhớ đệm. Đây là một vấn đề vô cùng
+nghiêm trọng mà nhiều thuật toán FIM-DS được đề xuất trước đây không giải quyết
+được.</p>
+<p>Dựa trên những hạn chế của những thuật toán trước đây và nhu cầu thực tiễn,
+vào năm 2015 tại tạp chí SIGMOD, Y.Yamamoto, K.Iwanuma và S.Fukuda đã đề xuất
+ra 1 hướng tiếp cận mới hướng tài nguyên giải quyết được vấn đề bursty data stream.
+Thuật toán được đề xuất tên là skip LC-SS [30], giải quyết vấn đề tràn bộ nhớ bằng
+cách giới hạn vùng nhớ sẽ lưu trữ. Thuật toán được đề xuất dựa trên ý tưởng từ 2
+80
+thuật toán nổi tiếng trước đó là Lossy counting (LC) và Space Saving (SS) đã được
+trình bày ở chương 4.</p>
+<h2><a name="6.2">6.2. Một số nghiên cứu trước đây</a></h2>
+<p>Đã có nhiều nghiên cứu trước đó làm việc trên khai thác itemset bằng cách tiếp
+cận hướng tham số sử dụng 1 cấu trúc giữ liệu hiệu quả để lưu trữ liệu như là cây tiền
+tố hay cây hậu tố [31, 32, 22]. tuy nhiên tất cả nguyên cứu đều xác định trước e và k
+bằng cách sử dụng các kiến thức biết trước về data stream, ví dụ như là sự phân phố
+dữ liệu, chiều dài tối đa của transactions. Tuy nhiên, dữ liệu thật thường gặp phải
+bursty data stream mà chiều dài của transaction là lớn hơn rất nhiều so với giả định
+của hệ thống, như là dữ liệu về địa lý. Ở Nhật Bản, dữ liệu về động đất rất được quan
+tâm.</p>
+<img src="./images/FIG06-01.jpg"/>
+<h4 align="center"><a name="fig06-01">Hình 6-1: Động đất xảy ra tại Nhật Bản [30]</a></h4>
+<p>Hình 6-1 cho thấy dòng transaction về động đất đã xảy ra tại Nhật Bản từ năm
+1981 – 2013 (16768 transactions). Tại thời điểm 3.11.2011, busty stream xuất hiện,
+chiều dài của transaction đột ngột rất cao và ngoài tầm giả định bộ nhớ của các nguyên
+cứu trước đây. Khi trường hợp bursty stream xảy ra, các nguyên cứu trước đây sẽ gây
+ra một lỗi nghiêm trọng vì vượt qua giả định bộ nhớ.</p>
+<p>Một nguyên cứu khác đã đề xuất một phương pháp giải quyết busty data stream
+[33]. Tuy nhiên, công việc đó tập trung vào một loại vấn đề khác của bursty data
+stream, cụ thể là tập trung vào khía cạnh giải quyết tỉ lệ bùng nổ transaction đổ tới tại
+mỗi đơn vị thời gian. Trái với vấn đề đang nguyên cứu là giải quyết bùng nổ tổ hợp
+được gây ra do chiều dài của transaction.</p>
+<h2><a name="6.3">6.3. Các khái niệm và ký hiệu</a></h2>
+<p>Về itemset và data stream (S). Cho I = $\{x_{1},x_{2},x_{3},…,x_{u}\}$ là tập hợp các items. Một
+itemset là tập con không rỗng của I. Transaction data stream S là 1 chuổi các
+transaction đang tới ${T_{1},T_{2},…,T_{N}}$, với T<sub>i</sub> là một itemset tới tại thời điểm i và N là
+số lượng transaction không biết trước.</p>
+<p>Về tổ hợp itemset được tạo ra từ 1 transaction. Mo(Ti) là tổ hợp itemset được tạo
+ra từ transaction T<sub>i</sub>. ave là kích thước trung bình của mo, ave = $\frac{\sum{i=1}{N}(2^{|T_{i}|}-1)}{N}$. n<sub>mo</sub> số
+lượng tổ hợp itemset có thể phát sinh của stream S, $n_{mo} = |\{2^{T_{1}} \cup ... \cup 2^{T_{N}}\}-\{\emptyset\}|$</p>
+<p>Về lưu trữ trong thuật toán. Table D là nơi lưu trữ trong thuật toán. Đơn vị lưu
+trữ trong table là entry, mỗi entry đại diện cho 1 itemset được lưu. |D| là số lượng
+entry được lưu trong table. Frequent count c(α) là số lần xuất hiện xấp xỉ của itemset
+α trong stream S được lưu trữ trong table.</p>
+<p>Về tham số trong thuật toán. Support của itemset α, kí hiệu supp(α), là số lần xuất
+hiện α trong stream S. Minimal Support σ (0 $\leq$ σ $\leq$ 1), item α được coi là phổ biến
+(frequent) nếu thỏa supp(α) $\geq$ σN. Tác vụ FIM-DS là tìm tất cả frequent itemsets từ
+stream S. Error parameter ϵ (0 < ϵ < σ) là tham số cho phép độ chính xác ở mức xấp
+xỉ của thuật toán. Thuật toán là ϵ-accurate nếu mỗi itemset kết quả α thỏa c(α) - ϵN
+$\leq$ supp(α) $\leq$ c(α). Thuật toán là ϵ-honest nếu c(α) $\leq$ ϵN cho mỗi α mà không lưu
+trong table D.</p>
+<h2><a name="6.4">6.4. Hướng tham số và hướng tài nguyên</a></h2>
+<p>Trước khi đi tiếp chi tiết thuật toán. Ta cần phải giải quyết vấn đề kích thước k
+của table D. Chọn table như thế nào là thỏa ϵ-accurate và ϵ-honest</p>
+<p><b>Lemma 1</b>: Cho D là table với kích thước k, S là stream với N transactions, và α
+là đối tượng muốn khai thác từ s (ở đây là itemset). Có tồn tại S và α thỏa supp(α) =
+$\frac{N*ave}{k+1}$ và α không được lưu trong table D.</p>
+<p>Chứng minh: Cho stream S mà nmo = k + 1 và mỗi mo(T<sub>i</sub>) có cùng số đối tượng,
+ave. Tổng số lần xuất hiện của k+1 đối tượng là N*ave. Giả sử mỗi đối tượng O<sub>i</sub> (1
+$geq$ i $geq$ k+1) xảy ra độc lập trong N transactions. Vậy, support của mỗi đối tượng O<sub>i</sub>
+là $\frac{N*ave}{k+1}$. Cho bất kì minimal support σ, chúng ta đều có thể tìm được giá trị cho ave
+thỏa $\sigma \leq \frac{ave}{k+1} < 1$. Do đó, mỗi đối tượng O<sub>i</sub> đều là phổ biến theo σ vì supp(O<sub>i</sub>) $geq$ σN.
+Do table chỉ chứa k đối tượng nhưng có tới k+1 đối tượng là phổ biến, vậy còn 1 đối
+tượng là α mà supp(α) = $\frac{N*ave}{k+1}$ và α không được lưu trong table D.</p>
+<p><b>Theorem 1</b>: k ít nhất là min($n_{mo},\frac{ave}{\epsilon}-1)$ cho thuật toán ϵ-accurate và ϵ-honest
+Chứng minh: với k=n<sub>mo</sub> thì table D có thể chứa tất cả đối tượng có thể có của
+stream S, n<sub>mo</sub> phải là chặn dưới của k. Bởi Lemma 1, có stream S và α mà supp(α) = $\frac{N*ave}{k+1}$
+và α không được lưu trong table D. Ngoài ra, thuật toán là ϵ-honest khi α mà
+không được lưu trong table thỏa c(α) $leq$ ϵN. Bên cạnh đó, thuật toán là ϵ-accurate
+nếu supp(α) $leq$ c(α). Từ tất cả điều trên, ta có $\frac{N*ave}{k+1} \leq \epsilon N$. Biến đổi bất đẳng thức,
+ta được $k \geq \frac{ave}{\epsilon}-1$. Vậy, chặn dưới của k là min($n_{mo},\frac{ave}{\epsilon}-1)$.</p>
+<p>Theorem 1 cho thấy giới hạn nghiệm trọng của cách tiếp cận hướng tham số trong
+việc khai thác itemset. Cho một tham số lỗi ϵ, ta yêu cầu ít nhất min($n_{mo},\frac{ave}{\epsilon}-1)$ entries;
+tuy nhiên, ave = $\frac{\sum{i=1}{N}(2^{|T_{i}|}-1)}{N}$ tăng theo hàm số mũ tương ứng với chiều dài Ti. Điều này
+chỉ ra rằng bất kì phương pháp hướng tham số nào có thể thất bại vì bỏ quên tài
+nguyên đặc biệt cho việc khai thác itemsets với bursty transction.</p>
+<h2><a name="6.5">6.5. Kết hợp thuật toán Lossy Counting và Space Saving</a></h2>
+<h3 class="subheader1">6.5.1. Thuật toán LC-SS</h3>
+<p>Thuật toán LC-SS là sự kết hợp của 2 thuật toán LC và SS, đặc biệt là SS. Thuật
+toán LC-SS lấy ý tưởng từ SS và áp dụng ý tưởng đó cho itemset. Thuật toán SS chỉ
+giành cho item nên tại 1 thời điểm chỉ cần thay thế 1 item khác có frequent count thấp
+nhất trong table bằng item mới, trong trường hợp table đã đầy. Điểm khác biệt của
+LC-SS so với SS ở chổ, tại 1 thời điểm không chỉ đơn thuần chỉ thay thế 1 item mà
+là 1 tập các itemset được lấy ra từ 1 transaction. Vấn đề của LC-SS phức tạp hơn
+nhiều so với thuật toán SS và cần thêm khái niệm error count ∆ của thuật toán LC.</p>
+<p>Tại sao khái niệm frequent count của thuật toán SS lại không thể áp dụng đối với
+thuật toán LC-SS cho itemset? Như đã nói ở trên, tại 1 thời điểm LC-SS thay thế 1
+tập itemset chứ không phải là 1 item. Nếu áp dụng nguyên si thuật toán SS vào thì sai
+ngay vì frequent count tự tăng sau mỗi lần thay thế. Thuật toán SS sẽ coi 1 tập itemset
+là chuỗi tuần tự các item và frequent count sẽ tăng rất nhanh dù thời gian là không
+đổi. Lấy ý tưởng error count ∆ từ thuật toán LC, thuật toán LC-SS tách rời khái niệm
+frequent count thành error count và frequent. Frequent là số đếm trực tiếp số lần xuất
+hiện của itemset mà table đang lưu trữ và error count là ước lượng số đếm của những
+itemset có thể đã được lưu và bị xóa đi vì có frequent count thấp nhất. Vấn đề được
+giải quyết, khi 1 tập itemset xuất hiện, ta chỉ cập nhật frequent còn error count tại thời
+điểm t chỉ giữ 1 giá trị.</p>
+<table border="1" align="center">
+<tr><th>Thuật toán 5: thuật toán baseline (LC-SS)</th>
+</tr>
+<tr>
+<td><b>Input</b>: Kích thước tối đa table k, minimal support σ, data stream S
+= $(T_{1}, T_{2}, …, T_{N})$.<br><b>Output</b>: Một tập xấp xỉ các frequent itemsets từ S
+<br>&#8195;1&#8195;&#8195;$i \gets 1$&#8195;&#8195;&#8195;&#8195;&#8195;&#8195;&#8195;&#8195; &#8195;&#8195;&#8195;&#8195;$\triangleright$ i là thời điểm hiện tại;
+<br>&#8195;2&#8195;&#8195;Khởi tạo D, $\Delta(1)$ và $\theta(D \gets \emptyset, \Delta(1) = 0, \theta =0)$
+<br>&#8195;3&#8195;&#8195;while i $\leq$ N do<br>&#8195;4&#8195;&#8195;&#8195;&#8195;Đọc $T_{i}$;<br>&#8195;5&#8195;&#8195;&#8195;&#8195;foreach $\alpha \subseteq T_{i}$ mà $\alpha$ đã được theo dõi trong D do
+<br>&#8195;6&#8195;&#8195;&#8195;&#8195;&#8195;&#8195;$f(\alpha)$++;<br>&#8195;7&#8195;&#8195;&#8195;&#8195;endfor<br>&#8195;8&#8195;&#8195;&#8195;&#8195;foreach $\alpha \subseteq T_{i}$ mà $\alpha$ chưa được theo dõi trong D do
+<br>&#8195;9&#8195;&#8195;&#8195;&#8195;&#8195;&#8195;if |D| < k then<br>&#8195;10&#8195;&#8195;&#8195;&#8195;&#8195;&#8195;&#8195;&#8195;Thêm entry mới $\langle \alpha,1,\Delta(i)\rangle$;
+<br>&#8195;11&#8195;&#8195;&#8195;&#8195;&#8195;&#8195;else<br>&#8195;12&#8195;&#8195;&#8195;&#8195;&#8195;&#8195;&#8195;&#8195;Tìm minimum entry ME = $\langle \beta,f(\beta),\Delta_{\beta}\rangle$;
+<br>&#8195;13&#8195;&#8195;&#8195;&#8195;&#8195;&#8195;&#8195;&#8195;Thay thế ME với $\langle \alpha,1,\Delta(i)\rangle$;<br>&#8195;14&#8195;&#8195;&#8195;&#8195;&#8195;&#8195;&#8195;&#8195;if $\theta < f(\beta )+\Delta_{\beta}$ then
+<br>&#8195;15&#8195;&#8195;&#8195;&#8195;&#8195;&#8195;&#8195;&#8195;&#8195;&#8195;$\theta \gets f(\beta) + \Delta_{\beta}$;<br>&#8195;16&#8195;&#8195;&#8195;&#8195;&#8195;&#8195;&#8195;&#8195;$\triangleright \theta$ được dùng để cập nhật \Delta(i) sau này
+<br>&#8195;17&#8195;&#8195;&#8195;&#8195;&#8195;&#8195;&#8195;&#8195;endif<br>&#8195;18&#8195;&#8195;&#8195;&#8195;&#8195;&#8195;endif<br>&#8195;19&#8195;&#8195;&#8195;&#8195;endfor
+<br>&#8195;20&#8195;&#8195;&#8195;&#8195;if $\Delta(i) < \theta$ then><br>&#8195;21&#8195;&#8195;&#8195;&#8195;&#8195;&#8195;$\Delta(i+1) \gets \theta$ và $\theta \gets 0$;
+<br>&#8195;22&#8195;&#8195;&#8195;&#8195;else<br>&#8195;23&#8195;&#8195;&#8195;&#8195;&#8195;&#8195;$\Delta(i+1) \gets \Delta(i)$;
+<br>&#8195;24&#8195;&#8195;&#8195;&#8195;endif<br>&#8195;25&#8195;&#8195;&#8195;&#8195;i++;<br>&#8195;26&#8195;&#8195;endwhile<br>&#8195;27&#8195;&#8195;for $\alpha \in D$ mà $f(\alpha)+\Delta_{\alpha} \geq \sigma N$ do
+<br>&#8195;28&#8195;&#8195;&#8195;&#8195;output $\alpha \triangleright \alpha$ là tập phổ biến biến ràng buộc $\sigma$ và N<br>&#8195;29&#8195;&#8195;endfor
+</td>
+</tr>
+</table>
+<h4 align="center">Thuật toán 5: thuật toán LC-SS [30]</h4>
+<p>Trong thuật toán LC-SS bên trên, giống với thuật toán LC, một entry cho itemset
+α được thể hiện dưới dạng tuple { α,f(α), ∆(t) }, nơi f(α) là số lần xuất hiện của a sau
+thời điểm t và ∆(t) là error count tại thời điểm t, với t là thời điểm gần nhất mà α được
+lưu.</p>
+<p>Khi transaction T<sub>i</sub> tới. Ta tìm tất cả tập con itemset của transaction T<sub>i</sub>, dòng 4.
+Tiến hành cập nhật lại frequent của các tập con itemset mà chúng đã nằm trong table,
+dòng 5 tới 7. Những tập con itemset chưa nằm trong table sẽ thêm vào table trong 2
+trường hợp sau. Nếu table chưa đầy |D| < k thì thêm mới, dòng 9 tới 10. Nếu table đã
+đầy |D| = k thì thay thế itemset có frequent count nhỏ nhất trong table, dòng 12 tới
+13. Ở trường hợp hai, có những thao tác thay thế bị thừa. Vấn đề này sẽ được giải
+quyết với thuật toán cải tiến skip LC-SS. Θ là biến tạm lưu tạm thời error count hiện
+tại, dòng 14 và 15. Sau khi đã cập những tất cả itemset con của 1 transaction, ta mới
+bắt đầu cập nhật lại error count, dòng 19 tới 23. Dòng 26 và 27 là xử lý lấy tập frequent
+itemset từ table ra ngoài.</p>
+<h3 class="subheader1">6.5.2. Ví dụ minh họa LC-SS</h3>
+<img src="./images/FIG06-02.jpg"/>
+<h4 align="center"><a name="fig06-02">Hình 6-2: Quá trình cập nhật table trong stream S từ T1 tới T4 [30]</a></h4>
+<p>Cho stream S chứa 4 transactions {a}, {a,b}, {b,c} và {a,b,c,d,e}. Cho miminal
+support là 0.6 và kích thước tối đa của table là 4. Hình 6-3 minh họa cách table được
+cập nhật theo quá trình xử lý từng transactions. Tại thời điểm i = 3, table đã đầy, và
+itemset có frequent count thấp nhất bị thay thế bởi 1 itemset ứng viên (candidate
+itemset). ∆(4) được cập nhật theo frequent count của itemset bị thay thế (∆(4) = 1).
+Tại thời điểm t = 4, mỗi itemset được lưu trữ trong table đều là con của T4, mỗi f được
+cộng thêm 1. Tiếp theo, 2 itemset ứng viên sẽ thay 2 entry thấp nhất. Có 27 tập ứng
+viên (227 – 4 -1) từ T4, phép toán thay thế được hiện 27 lần. Cuối cùng ∆(5) được cập
+nhật là 2. Sau T4, kết quả trả về là {a} và {b} vì chúng có frequent count lớn σN =
+0.6*4.</p>
+<h3 class="subheader1">6.5.3. Tính chất của LC-S</h3>
+<p><b>Lemma 2</b>: Cho ∆(t) là error count tại thời điểm t. ∆(t) là chặn trên của support
+của những itemset trong khoảng thời gian [1,t) mà bị thay thế trước thời điểm t.</p>
+<p>Chứng minh: Lemma 2 được chứng minh bằng phương pháp toán học quy nạp.
+Khi t = 1, ∆(1) = 0. Vì không có itemset nào xuất hiện trước thời gian t = 1, lemma
+2 đúng. Giả sử lemma 2 đúng với t $leq$ i, ta chứng minh lemma 2 đúng với t+1. Cho
+itemset β mà đã được thay thế tại thời điểm [1,t).Ta chia làm 2 trường hợp: Trường
+hợp 1: β được thay thế tại thời điểm t<i. Vì lemma 2 đã đúng với t $leq$ i, support β tại
+thời điểm [1,t) nhỏ hơn hay bằng t. Trường hợp 2: β được thay thế tại thời điểm t = i.
+f(β) + ∆β là chặn trên của support β trong khoảng thời gian [1,t+1). Tại dòng 20 của
+thuật toán LC-SS, ∆(i+1) được cập nhật tới f(β) + ∆β nếu f(β) + ∆β $geq$ ∆(i). Như vậy,
+∆(i+1) là chặn trên của sup(β). Vậy lemma 2 được giữ.</p>
+<p><b>Lemma 3</b>: Cho S là 1 stream chứa N transactions. Với mỗi itemset α, nếu sup(α)
+> ∆(N + 1) thì α còn lại trong table.</p>
+<p>Chứng minh: Giả sử có 1 itemset α thỏa sup(α) > ∆(N + 1) và α không nằm trong
+table. Vì α đã bị thay thế trong khoảng thời gian [1,N], do đó sup(α) $leq$ ∆(N + 1)
+theo lemma 2. Tuy nhiên, điều này mâu thuẩn với điều kiện của α, sup(α) > ∆(N + 1).</p>
+<p>Sử dụng Lemma 3, ta tìm được theorem đảm bảo tính hiệu lực của output bởi
+thuật toán LC-SS.</p>
+<p><b>Theorem 2</b>: Cho S là 1 stream chứa N transactions và σ là minimal support. Nếu
+∆(N + 1) < σN thì mỗi frequent itemset ràng buộc theo S và σ được output bởi thuật
+toán LC-SS. Bên cạnh đó, mỗi output α thỏa σN - ∆(N + 1) $leq$ sup(α).</p>
+<p>Chứng minh: α là frequent itemset ràng buộc theo S và σ khi và chỉ khi sup(α) $geq$
+σN (1). Từ (1) với giả thiết ∆(N + 1) < σN, α phải có support thỏa sup(α) > ∆(N + 1).
+Theo lemma 3, mỗi itemset mà có support cao hơn ∆(N + 1) thì vẩn còn trong table.
+Vậy, α luôn được lưu trong table và sẽ là output của dòng 27 của thuật toán LC-SS.
+Bên cạnh đó, mỗi output α thỏa σN <= f(α) + ∆α . Vì f(α) $\leq$ sup(α) và ∆α $\leq$ ∆(N +
+1), ta được σN $\leq$ sup(α) + ∆(N + 1).</p>
+<p>Theorem 2 đảm bảo thuật toán LC-SS trả về kết quả no false-negative với điều
+kiện ∆(N + 1) < σN. Thỉnh thoảng ∆(N + 1) có thể vượt qua ngưỡng ∆(N + 1) nếu k
+là quá nhỏ. Ngay cả trong trường hợp này, thuật toán LC-SS vẩn đảm bảo output của
+thuật toán, như được mô ta bên dưới.</p>
+<p>Theorem 3: Cho S là 1 stream chứa N transactions và support σ<sub>∆</sub> là $\frac{\delta(N+1)+1}{N}$.
+Mỗi frequent itemset ràng buộc theo S và σ∆ có thể được output bởi thuật toán LC-
+SS.</p>
+<p>Chứng minh: Mỗi itemset α mà có sup(α) >= ∆(N + 1) + 1 đều là frequent itemset
+ràng buột theo S và σ∆ vì sup(α) $\geq$ σ<sub>∆</sub>N với σ<sub>∆</sub> = $\frac{\delta(N+1)+1}{N}$. Theo lemma 3, itemset
+α còn nằm trong table. Vậy, mỗi itemset α có thể được output bởi thuật toán LC-SS.</p>
+<p>Theorem 3 xác định được chặn dưới của σ là σ<sub>∆</sub>, đảm bảo thuật toán trả về kết
+quả no false-negative. Biết được σ<sub>∆</sub> khá là giá trị vì người sử dụng có thể điều chỉnh
+σ trong quá trình chạy thuật toán để đạt được kết quả như ý mà không ảnh hưởng đến
+tính đảm bảo của thuật toán.</p>
+<h2><a name="6.6">6.6. Thuật toán skip LC-SS</a></h2>
+<h3 class="subheader1">6.6.1. Hạn chế của thuật toán LC-SS</h3>
+<p>Thuật toán LC-SS yêu cầu $2^{|T_{i}|}$− 1 phép toán cập nhật và thay thế cho bất kì
+transaction T<sub>i</sub>. Nếu bursty stream tới, như là T<sub>4</sub> trong ví dụ 2, thời gian truy cập table
+sẽ tăng theo hàm mũ. Như vậy, mặc dù thuật toán LC-SS có thể ngăn tràn bộ nhớ
+nhưng thời gian xử lý còn là một vấn đề lớn, đặc biệt là khi bursty stream tới. Do đó,
+thuật toán skip LC-SS được đề xuất để giải quyết vấn đề này. Ý tưởng là loại bỏ đi
+những phép toán thay thế thừa từ LC-SS để tăng tốc độ xử lý thuật toán.</p>
+<p>Nhắc lại ví dụ. Tại thời điểm i = 4, bursty transaction cung cấp 27 tập ứng viên.
+Vì table đã đầy, mỗi tập ứng viên được thay thế với itemset có frequent count thấp
+nhất được lưu trong table. Thuật toán LC-SS đã thực hiện 27 phép toán thay thế. Kết
+quả cho thấy chỉ có 2 tập ứng viên {d} và {e} được lưu thay cho vị trí có frequent
+count thấp nhất, được lưu trước đó, trong table là {b,c} và {c}. Còn 25 tập ứng viên
+còn lại đã được lưu nhưng lại bị thay thế bởi tập ứng viên khác và kết quả là chúng
+không nằm trong table. Vì thứ tự của các tập ứng viên là tùy ý nên thay vì {d} và {e},
+kết quả của T<sub>4</sub> cũng có thể {a,c} và {b,e}. như vậy, chỉ cần thay thế 2 tập bất kì trong
+27 tập ứng viên là đủ. Do đó, ta không cần phải thực hiện 27 phép toán thay thế trong
+ví dụ này.</p>
+<h3 class="subheader1">6.6.2. Thuật toán cải tiến skip LC-SS</h3>
+<p><b>Định nghĩa</b>: Ta gọi entry mà lưu tập rỗng là empty entry. Với định nghĩa đó, ta
+giả sử rằng lúc khởi tạo entry table chứa k empty entry với kích thước tối đa của table
+là k. Do đó, nếu table chứa các empty entry thì minimal entry là các empty entry và
+có frequent count là 0. Thêm nữa, cs(i), me(i) và c<sub>min</sub>(i) lần lượt là số tập ứng viên, số
+minimal entry và frequent count của minimal entry.</p>
+<p>Từ định nghĩa ở trên, phép toán thay thế của thuật toán LC-SS có thể được gom
+lại thành 3 trường hợp.</p>
+<p><b>Trường hợp A</b>: me(i) > cs(i). Sau khi thay thế cs(i) minimal entries với tập ứng
+viên cs(i), minimal entries trước đó vẩn tồn tại trong table. Lưu ý rằng mỗi entry mới
+có cùng frequent count là ∆(N) + 1. $$c_{min} = min(c_{min}(i),\Delta(N)+1),$$<p>
+<p>$$\Delta(i+1) = c_{min}(i)$$</p>
+<img src="./images/FIG06-03.jpg"/>
+<h4 align="center"><a name="fig06-03">Hình 6-3: Trường hợp A: me(i) > cs(i) [30]</a></h4>
+<p><b>Trường hợp B</b>: me(i) = cs(i). Tất cả minimal entries được thay bởi tập ứng viên.
+Frequent count của tập ứng viên là ∆(N) + 1. c<sub>min</sub>(i+1) có thể là ∆(N) + 1 hay là entry
+có frequent count thấp thứ 2 sau me(i), có frequent count tại thời điểm I là c<sub>min</sub>(i) + r
+với r (r$/geq$1).</p>
+<img src="./images/FIG06-04.jpg"/>
+<h4 align="center"><a name="fig06-04">Hình 6-4: Trường hợp B: me(i) = cs(i) [30]</a></h3>
+<p><b>Trường hợp C</b>: me(i) < cs(i). Ban đầu, mỗi minimal entry được thay thế với 1
+số tập ứng viên. Sau đó, các tập ứng viên vừa được thêm vào table lại bị thay thế bởi
+những tập ứng viên khác. Θ đã được cập nhật thành ∆(N) + 1 do 1 tập ứng viên có
+frequent count ∆(N) + 1 đã bị xóa. Ở dòng , ∆(i+1) được cập nhật lại bằng Θ. $$c_{min} = min(c_{min}(i)+r,\Delta(N)+1)$$</p>
+<p>$$\Delta(i+1) = \Delta(i)+1$$</p>
+<img src="./images/FIG06-05.jpg"/>
+<h4 align="center"><a name="fig06-05">Hình 6-5: Trường hợp C: me(i) < cs(i) [30]</a></h4>
+<p>Từ những trường hợp trên, ta đạt được một mối quan hệ giữa ∆(t) và c<sub>min</sub>(t). Có
+thể dễ dàng chứng minh điều này bằng phương pháp quy nạp toán học.</p>
+<p><b>Theorem 4</b>: ∆(t) $\leq c_{min}(t) \leq$ ∆(t)+1 cho mỗi thời điểm t.</p>
+<p>Dựa vào theorem 4, ta xác định công thức tính cmin(t) và ∆(t) cho từng trường
+hợp $$\begin{cases} \text{Case A: me(i) > cs(i) then } c_{min}(i+1) = c_{min}, \Delta(i+1) = c_{min}(i).
+\\ \text{Case B: me(i) = cs(i) then } c_{min}(i+1) = \Delta(i), \Delta(i+1) = c_{min}(i).\quad(1)
+\\ \text{Case C: me(i) < cs(i) then } c_{min}(i+1) = \Delta(i)+1, \Delta(i+1) = \Delta(i)+1.\end{cases}$$</p>
+<p>Việc bỏ đi 1 số phép toán thay thế sẽ ảnh hưởng tới 1 số tham số khác của thuật
+toán như là ∆(t). Việc tính c<sub>min</sub>(i+1) và ∆(t+1) là cần thiết để duy trì tính đùng đắn
+của thuật toán LC-SS.</p>
+<p>Thuật toán skip LC-SS được đề xuất, là thuật toán LC-SS đã bỏ đi những phép
+toán thay thế thừa.</p>
+<table border="1" align="center">
+<tr>
+<th>Thuật toán 6 : thuật toán Skip LC-SS</th>
+</tr>
+<tr>
+<td><b>Input</b>: Kích thước tối đa table k, minimal support σ, data stream S
+= $(T_{1}, T_{2}, …, T_{N})$.<br><b>Output</b>: Một tập xấp xỉ các frequent itemsets từ S
+<br>&#8195;1&#8195;&#8195;$i\gets 1$;&#8195;&#8195;&#8195;&#8195;&#8195;&#8195;&#8195;&#8195; &#8195;&#8195;&#8195;&#8195;$\triangleright$ i là thời điểm hiện tại<br>&#8195;2&#8195;&#8195;D chứa k empty sets,$\Delta(1) \gets 0$;
+<br>&#8195;3&#8195;&#8195;r(1) $\gets$ 0;;&#8195;&#8195; &#8195;&#8195;&#8195;&#8195;&#8195;&#8195;&#8195;$\triangleright$ r(i): số entries thuộc $T_{i}$
+<br>&#8195;4&#8195;&#8195;$c_{min} \gets 0, me(1) \gets k, cs(1) \gets 0$;&#8195;&#8195;$\triangleright$ 4 biến mới
+<br>&#8195;5&#8195;&#8195;while i $\leq$ N do<br>&#8195;6&#8195;&#8195;&#8195;&#8195;Đọc $T_{i}$;
+<br>&#8195;7&#8195;&#8195;&#8195;&#8195;foreach $\alpha \subseteq T_{i}$ mà $\alpha$ đã được theo dõi trong D do
+<br>&#8195;8&#8195;&#8195;&#8195;&#8195;&#8195;&#8195;$f(\alpha)++$ và r(i)++;<br>&#8195;9&#8195;&#8195;&#8195;&#8195;endfor
+<br>&#8195;10&#8195;&#8195;&#8195;&#8195;Cập nhật $c_{min}(i)$ và me(i) bằng kiểm tra D<br>&#8195;11&#8195;&#8195;&#8195;&#8195;Cập nhật cs(i) $\gets 2^{|T_{i}|}$ - r(i) - 1;
+<br>&#8195;12&#8195;&#8195;&#8195;&#8195;if cs(i) < me(i) then<br>&#8195;13&#8195;&#8195;&#8195;&#8195;&#8195;&#8195;Lựa chọn tất cả tập ứng viên cs(i) từ $T_{i}$;
+<br>&#8195;14&#8195;&#8195;&#8195;&#8195;else<br>&#8195;15&#8195;&#8195;&#8195;&#8195;&#8195;&#8195;Lựa chọn ngẫu nhiên tập ứng viên me(i) từ $T_{i}$;
+<br>&#8195;16&#8195;&#8195;&#8195;&#8195;endif<br>&#8195;17&#8195;&#8195;&#8195;&#8195;Thay thế minimal entry bằng tập được lựa chọn trong D
+<br>&#8195;18&#8195;&#8195;&#8195;&#8195;&#8195;&#8195;mà có frequent count được gán là $\Delta(i)+1$;<br>&#8195;19&#8195;&#8195;&#8195;&#8195;Cập nhật $c_{min}(i+1)$ và $\Delta (i+1)$ bởi phương trình (1);
+<br>&#8195;20&#8195;&#8195;&#8195;&#8195;i++;<br>&#8195;21&#8195;&#8195;&#8195;&#8195;$r(i) \gets 0$;<br>&#8195;22&#8195;&#8195;endwhile
+<br>&#8195;23&#8195;&#8195;for $\alpha \in$ D mà $f(\alpha) + \Delta_{\alpha} \geq \sigma N$ do
+<br>&#8195;24&#8195;&#8195;&#8195;&#8195;output $\alpha$;$\triangleright \alpha$ là tập phổ biến biến ràng buộc $\sigma$ và N
+<br>&#8195;25&#8195;&#8195;endfor
+</td>
+</tr>
+</table>
+<h4 align="center">Thuật toán 6: thuật toán Skip LC-SS [30]</h4>
+<p>Trong thuật toán skip LC-SS. Đẩu tiên, thay vì một lúc duyệt tất cả itemset con
+của transaction Ti như LC-SS thì thuật toán chỉ cập nhật lại frequent của các itemset
+con mà chúng đã nằm trong table. r(i) cho biết số lượng itemset con của transaction
+Ti đã nằm trong table, dòng 7 và 8. Tại dòng 11, cs(i) = $2^{|T_{i}|} -(i) -1$. Tại dòng 12
+tới dòng 16, thao tác lựa chọn tập itemset sẽ thay thế từ tập ứng viên theo cs(i) và
+me(i). Dòng 17 và 18, thay thế minimal entries bằng tập đựa lựa chọn với frequent
+count là ∆(N) + 1. Cuối cùng, dòng 19, c<sub>min</sub>(i+1) và ∆(N+1) được tính bởi phương
+trình (1).</p>
+<h3 class="subheader1">6.6.3. Ví dụ minh họa</h3>
+<img src="./images/FIG06-06.jpg"/>
+<h4 align="center"><a name="fig06-06">Hình 6-6 : Cập nhật table từ T1 tới T5 [30]</a></h4>
+<p>Cho stream S chứa 5 transactions {a}, {a,b}, {b,c}, {a,b,c,d,e} và {a,c}. Cho
+miminal support là 0.6 và kích thước tối đa của table là 4. Hình minh họa cách table
+D và tập các thêm số bao gồm r,cs,c<sub>min</sub>,me và ∆ được cập nhật từ khoảng thời gian i
+= 1 tới 5 bởi thuật toán skip LC-SS. Tại thời điểm i = 4, mỗi entry trong table là con
+của transaction T<sub>i</sub>, ta có r(i) = 4. c<sub>min</sub>(4) và me(4) được cập nhật là 2 tại dòng số 10.
+Số tập ứng viên được tính tại dòng 11, c(4) = 25 – 1 –r(4) = 27. Vì cs(4) > me(4), ta
+cập nhật c<sub>min</sub>(5) = ∆(4)+1 = 2 và ∆(5) = ∆(4) + 1 tương ứng với phương trình (1).
+Tại thời điểm i = 5, chỉ có entry {α} là tập con của T<sub>5</sub>, r(5) = 1. Tiếp, ta tính được
+c(5) = 22-1-1 = 2 và min(5) = me(5) = 2. Vì c(5) = me(5) nên min(6) = ∆(5) + 1 và
+∆(6) = min(5) = 2 theo phương trình (1). Output là tất cả entry trong table vì chúng
+đều thỏa frequent count lớn hơn hay bằng σN = 0.6*5 = 0.3.</p>
+<p>Thuật toán skip LC-SS là cải tiến của LC-SS ở phương diện hiệu năng nên vẩn
+giữ nguyên được tính đúng đắn mà thuật toán LC-SS đã có. Sau đâu là đánh giá về
+thời gian xử lý của thuật toán.</p>
+<h3 class="center">6.6.4. Tính chất của skip LC-SS</h3>
+<p>Theorem 6. Cho T là transaction với chiều dài L và k là kích thước của table.
+Thuật toán skip LC-SS xử lý T trong O(kL) bước.</p>
+<p>Chứng minh : Trong thuật toán skip LC-SS, có 2 xử lý tốn thời gian nhất : Cập
+nhật table tại dòng 7-9 và lựa chọn me(i) tập ứng viên từ T<sub>i</sub> tại dòng 12-16. Với xử
+lý cập nhật, thuật toán yêu cầu k*O(L) bước vì ít nhất O(L) lần kiểm tra transaction
+T với k entires được lưu trong table. Với xử lý lựa chọn tập ứng viên, thuật toán yêu
+cầu 2k*O(L) bước. Giả sử ta phát sinh 2k tập con của itemset từ transaction T. Nếu
+như table đã chứa k tập con ta vừa phát sinh thì vẩn còn k tập con còn lại cho tập ứng
+viên. Vì me(i) $leq$ k, k tập ứng viên là đủ cho phép toán thay thế. Vậy, cả hai phép
+toán thay thế có thể được thực hiện trong O(kL) bước cho T.</p>
+<h2><a name="6.7">6.7. Cải tiến thuật toán skip LC-SS</a></h2>
+<p>Vấn đề về bộ nhớ đã được giải quyết một cách thỏa đáng bởi thuật toán LC-SS.
+Thuật toán skip LC-SS được đề xuất cải tiến hiệu năng nhưng vẩn đảm bảo được
+những tính chất của thuật toán LC-SS. Sau đây, ta sẽ bàn luận về những hướng cải
+tiến cho thuật toán skip LC-SS về mặt hiệu năng</p>
+<h3 class="subheader1">6.7.1. r-skip và t-skip</h3>
+<p>t-skip và r-skip cải tiến thuật toán skip LC-SS về mặt hiệu năng bằng cách loại
+bỏ thêm những phép toán thay thế hay cập nhật mà khi bỏ chúng có thể cải thiện hiệu
+năng của thuật toán. T-skip và r-skip không còn duy trì được thuật toán LC-SS như
+skip LC-SS nhưng hiệu năng được cải thiện.</p>
+<p>Trong trường hợp C của phương trình (1), error count ∆(i) phải tăng 1 dù phép
+toán thay thế có thể thực hiện được hay không. Nói cách khác, ta có thể bỏ tất cả phép
+toán thay trong trường hợp C. Điều này dễ dàng được hiện bằng việc kiểm tra me(i)
+> cs (i) trước dòng 17 của thuật toán skip LC-SS. Ta gọi thao tác trên là cải tiến rskip.</p>
+<p>Đánh giá cải tiến r-skip. Theo Lemma 3, itemset α mà có sup(α) > ∆(N+1) thì α
+được lưu trong table. Lemma 3 không ràng buộc cho sup(α) = ∆(N+1). Vậy những
+itemset mới được thay thế trong trường hợp C có sup(α) = ∆(N+1) có nằm trong table
+hay không, điều đó không ảnh hưởng tới Lemma 3 và không ảnh hưởng đến kết quả
+của thuật toán. Vậy, cải tiến r-kip không không làm thay đổi kết quả của thuật toán
+skip LC-SS.</p>
+<p><b>Lemma 4</b>: Cho T<sub>i</sub> là 1 transaction tại thời điểm i và k là kích thước của table.
+Nếu $2^{|T_{i}-1|}$ > k, thì me(i) < cs(i) đúng.</p>
+<p>Chứng minh: Theo định nghĩa, ta có cs(i) = $2^{|T_{i}|} - r(i) -1$. Vì k $\geq$ r(i) nên cs(i)
+$\geq 2^{|T_{i}|}-k-1$(1). Theo giả thiết, ta có $2^{|T_{i}|-1}$ > k. Biến đổi giả thiết ta được $2^{|T_{i}|}>2k+2$ (2). Từ (1) và (2), ta có cs(i) $\geq$ k+1. Vì k $\geq$ me(i), cs(i) > me(i) được giữ.</p>
+<p>Trường hợp T<sub>i</sub> thỏa $2^{|T_{i}|-1}$ > k thì cs(i) > me(i). Cải tiến r-skip chắc chắn được
+thực hiện trước khi xác định me(i) và cs(i). Vẩn còn thao tác cập nhật tốn O(kL) thời
+gian xử lý. Cải tiến t-skip bỏ luôn cả 2 phép toán cập nhật và thay thế để tăng tốc độ
+xử lý. Nói cách khác, cải tiến t-skip bỏ xử lý transaction T<sub>i</sub> nếu chiều dài của nó lớn
+hơn log(k) + 1.</p>
+<p>Trong t-skip, frequent count của 1 entry có thể thấp hơn support thật của nó vì
+một số thao tác cập nhật đã đã bị bỏ qua trong khoảng thời gian trước. Nói cách khác,
+t-skip có thể tạo ra kết quả false-negatives ngay cả khi thỏa điều kiện ∆(N+1) < σN.
+Để giải quyết vấn đề này, ta xem xét 2 cách tiếp cận bên dưới.</p>
+<p><b>Tiếp cận 1</b>: Thay đổi điều kiện của kết quả. Ta thêm 1 biến X mới cho biết số
+lần thực hiện t-skip. Sau đó, ta kiểm tra xem f(α) + ∆α + X > σN cho mỗi entry α là
+output của thuật toán. Ta gọi cách tiếp cận này là t<sub>1</sub>-skip.</p>
+<pTiếp cận 2: Tăng frequent count của mỗi entry cho mỗi lần t-skip được thực hiện.
+Khác t<sub>1</sub>-skip, ta không thay đổi điều kiện của output. Ta gọi tiếp này là t<sub>2</sub>-skip.</p>
+<p>Đánh giá cải tiến t-skip. T-skip không còn duy trì được kết quả như r-skip. Mỗi
+cách tiếp cận t-skip có nhược điểm riêng. Về khía cạnh xử lý, cách tiếp cận 2 cần
+duyệt tất cả entries khi t<sub>2</sub>-skip được thực hiện. Ngược lại, cách tiếp cận 1 có thể làm
+giảm độ chính xác của thuật toán vì làm tăng số lượng non-frequent itemsets trong
+ouput. Dẩn đến điều đó là vì cách tiếp cận 1 phải cộng thêm tham số lỗi X cho mỗi
+entry α ngay cả khi α đó không bị ảnh hưởng bởi phép toán t-skip trước đó.</p>
+<h3 class="subheader1">6.7.2. Stream reduction</h3>
+<p>Ở đây, ta cải tiến hiệu năng của thuật toán skip LC-SS bằng cách sử dụng stream
+reduction để nén động mỗi transaction. Chiều dài L của một transaction là nhân tố
+chính cho việc xác định hiệu năng của thuật toán skip LC-SS, theo Theorem 6 và
+Lemma 4. Ý tưởng của stream reduction nằm ở một sự thật rằng hầu hết các item
+trong bursty transactions là non-frequent. Theo nguyên lý non-monotonicity, mỗi
+itemset có bất kì item nào là non-frequent thì nó không frequent. Như vậy, ta có thể
+loại bỏ những non-frequent items từ mỗi transaction.</p>
+<img src="./images/FIG06-07.jpg"/>
+<h4 align="center">Hình 6-7: Mô hình kết hợp giữa stream reduction với thuật toán skip LC-SS [30]</h4>
+<p>Hình 6-7 là minh họa cho mô hình kết hợp giữa stream reduction với thuật toán
+skip LC-SS. Transaction T<sub>i</sub> sau khi qua stream reduction sẽ loại bỏ đi những item là
+non-frequet thành transaction con T’<sub>i</sub>. Sau đó, transaction T’<sub>i</sub> sẽ đi vào thuật toán
+skip LC-SS để xử lý. Để loại bỏ các phần tử là non-frequent, stream reduction không
+hoạt động độc lập mà phụ thuộc vào error count ∆(i) và minimal support σ từ thuật
+toán skip LC-SS.</p>
+<p>Thuật toán SS-ST được đề xuất cho thành phần stream reduction. Thuật toán SS-
+ST đạt được bởi việc mở rộng thuật toán SS từ khai thác dòng item thành khai thác
+dòng transaction. Thuật toán SS-ST tính frequent count cI cho mỗi item trong
+transaction T<sub>i</sub> tại thời điểm t. Cho ∆(i) là error count tại thời điểm i của thuật toán
+skip LC-SS. Nếu c<sub>i</sub> $\leq$ ∆(i) thì e nên được xóa khỏi T<sub>i</sub>, vì cho mỗi tập con a<sub>e</sub> của T<sub>i</sub>
+mà chứa e, c(α<sub>e</sub>) $\leq$ ∆(i) được giữ. Ta không nên lưu những tập con mà có frequent
+nhỏ hơn ∆(i).</p>
+<p>Thuật toán SS-ST được mô tả đầy đủ hơn trong paper [34], nhưng để giới hạn
+phạm vi của luận văn nên nhóm em không đi sâu vào thuật toán SS-ST này. Dưới đây
+sẽ mô tả ngắn gọn thuật toán:</p>
+<p><b>Theorem 7</b>: Nếu $k_{im} \geq \frac{L_{ave}}{\epsilon}$, mỗi frequent item e mà sup(e) $\geq \epsilon N$ được lưu trong
+table D.</p>
+<p>Chứng minh: Ta dùng phản chứng, giả sử tồn tại một item e mà $k_{im} \geq \frac{L_{ave}}{\epsilon}$(1)
+và sup(e) $\geq$ eN mà e không được lưu trong table D. Theo Lemma 2 của bài báo [13]
+thì min < $\frac{c}{k}$(2). Từ (1) và (2) ta được min $\leq \frac{c\epsilon}{L_{ave}}$. Mà $L_{ave} = \frac{c}{N}$, ta được min $\leq \epsilon N$
+Theo theorem 1 của bài báo [23] thì sup(e) < min nên sup(e) < $\epsilon N$ mâu thuẩn với giả
+thiết sup(e) $\leq \epsilon N$. Vậy không tồn tại item e thỏa điều kiện nhưng không nằm trong
+table D.
+<h2><a name="6.8">6.8. Vận dụng</a></h2>
+<p>Trong mục này, chúng tôi sẽ trình bày cách mà thuật toán Skip LC-SS được tích
+hợp như thế nào trong hệ thống phân tích Data Stream mà chúng tôi đang xây dựng.
+Hình 6-8 cho biết interface mà hệ thống cung cấp cho một thuật toán để tích hợp vào
+hệ thống.</p>
+<img src="./images/FIG06-08.jpg"/>
+<h4 align="center">Hình 6-8: Lớp interface tích hợp thuật toán</h4>
+<p>Theo interface FrequentPattern sẽ có function mà thuật toán cần implement cho
+lớp Skip LC-SS:</p>
+<ul>
+<li><b>setParameters</b>: là nơi thiết lập tham số cho thuật toán. Vì thuật toán yêu
+cầu 2 tham số là minimum support $\sigma$, 0 < $\sigma$ ≤ 1 và k, k > 0 cho biết kích
+thước tối đa của table D, Input của function kiểu String có dạng “$\sigma$,k".</li>
+<li><b>Run</b>: là nơi chạy thuật toán xử lý cho mỗi transaction tới. Thuật toán được
+cài đặt trong function này. Input của function là transaction chứa một
+chuỗi các IdItems cách nhau bằng dấu phẩy “,”;</li>
+<li><b>getResults</b>: là nơi lấy kết quả của thuật toán. Thuật toán trả về kiểu String
+có định dạng JSon trong đó có danh sách các itemset phổ biến trên ngưỡng $\sigma$</li>
+</ul>
+<p>Lớp Skip LC-SS sẽ được tích hợp vào hệ thống và hoạt động như là thành
+phần lõi chuyên xử lý dữ liệu của hệ thống. Kết quả chuổi Json được lưu vào
+Redis Cluster (Chương 3) và phân tán cho người dùng.</p>
+<h2><a name="6.9">6.9. Tổng kết</a></h2>
+<p>Trong chương này, chúng ta bàn luận về một phương phá khai thác FIM-DS dựa
+trên các tiếp cận hướng tài nguyên. Điểm khó khăn của FIM-DS nằm ở chổ làm cách
+nào để quản lý sự bùng nổ tổ hợp của tập các ứng viên được lưu trữ. Mặc dù có nhiều
+phương pháp nổi tiếng dựa cách tiếp cận tham số, mỗi cách tiếp cận này đều có nhược
+điểm của chính nó đó chính là gây ra tràn bộ nhớ đặc biệt là đối với dữ liệu thật khi
+có sự kiện bursty stream xảy ra. Trong chương này, chúng ta đầu tiên trình bày chặn
+dưới sử dụng bộ nhớ của các phương pháp tiếp hướng tham số và sau đó đề xuất một
+thuật toán hướng LC-SS tài nguyên chỉ yêu cầu O(k) không gian bộ nhớ, mà đạt được
+bằng việc kết hợp hai thuật toán Lossy Count và Space Saving trong ngữ cảnh của
+khai thác itemset. Thuật toán Skip LC-SS là cải tiến từ thuật toán LC-SS tăng tốc độ
+xử lý, chỉ yêu cầu O(kLN) thời gian với k, L và N lần lượt là kích thước tối đa của
+table D, chiều dài tối đa của transaction trong stream và số lượng transactions. Chúng
+ta nhấn mạnh rằng thuật toán Skip LC-SS có thể trả ra kết quả mà không bị tràn bộ
+nhớ, chạy nhanh hơn nhưng vẩn giữ được tính đảm bảo của thuật toán LC-SS. Chúng
+ta còn nói tới một số cải tiến để tăng hiệu năng của thuật toán Skip LC-SS như các
+kỹ thuật skip hay dùng stream reduction để giảm kích thước của transactions trước
+khi xử lý thuật toán. Bên cạnh giới thiệu thuật toán Skip LC-SS, chúng tôi đã trình
+bày cách triển khai thuật toán vào hệ thống phân tích Data Stream.</p>
+</body>
+</html>

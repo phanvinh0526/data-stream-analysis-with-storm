@@ -1,0 +1,186 @@
+<html>
+<head>
+<meta charset="UTF-8">
+<link rel="stylesheet" type="text/css" href=".\thesis.css">
+<script type="text/x-mathjax-config">
+  MathJax.Hub.Config({tex2jax: {inlineMath: [['$','$'], ['\\(','\\)']]}});
+</script>
+<script type="text/javascript"
+  src="http://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML">
+</script>
+</head>
+<body>
+<h1>CHƯƠNG 3:	KIẾN TRÚC HỆ THỐNG KHAI THÁC DATA STREAM</h1>
+<p class="abstract">Trong chương này, chúng tôi sẽ trình bày mô hình thiết kế hệ thống phân tích Data Stream, dựa trên mẫu kiến trúc lý thuyết đã được đề cập tại chương 2. Chúng tôi cũng sẽ trình bày về vai trò của từng thành phần trong hệ thống, tính linh hoạt trong khâu triển khai và khả năng tích hợp những thuật toán khai thác dữ liệu vào bên trong hệ thống. Qua đó, cho thấy vai trò và tầm quan trọng của mẫu kiến trúc trong việc khai thác Data Stream.</p>
+<h3>Các mục chính trong chương:</h3>
+<p><a href="#3.1">3.1.	Mô hình thiết kế hệ thống tổng quan</a></p>
+<p><a href="#3.2">3.2.	Mô hình thiết kế chi tiết các thành phần trong hệ thống</a></p>
+<p><a href="#3.3">3.3.	Cài đặt và tích hợp thuật toán</a></p>
+<h2><a name="3.1">3.1.	Mô hình thiết kế hệ thống tổng quan</a></h2>
+<h3 class="subheader1">3.1.1.	Giới thiệu mô hình</h3>
+<p>Trong mục này, chúng tôi sẽ trình bày mô hình thiết kế của toàn bộ hệ thống phân tích Data Stream. Mô hình thiết kế này sử dụng những frameworks mạnh mẽ đã được chúng tôi đề cập trong mục 2.3. Mô hình này bao gồm 6 thành phần chính, đó là Data source, Kafka, Storm cluster, ZooKeeper, RedisDB, và NodeJS, mỗi thành phần đảm nhận những chức năng riêng. Về môi trường, mô hình này được triển khai trên 8 server vật lý. Trong đó, ZooKeeper server đóng vai trò quan trọng nhất, nó làm giúp đảm bảo tính high-availability cho toàn bộ các nodes trong hệ thống. </p>
+<p>Hình 3-1 thể hiện mô hình thiết kế của hệ thống phân tích Data Stream. Đầu tiên, dữ liệu sẽ được phát ra từ các Data sources và truyền vào Kafka server để phân luồng, lưu trữ và phun dữ liệu cho những ứng dụng nào cần; cụ thể trong mô hình trên, supervisor sẽ lấy dữ liệu từ Kafka. Tại đây, Storm thực hiện quá trình xử lý dữ liệu, những kết quả khai thác được sẽ được lưu trữ vào Redis cluster. Khi Redis cập nhật dữ liệu vào database, nó sẽ phát thông báo cho NodeJS biết để thực hiện việc phân tán dữ liệu cho người dùng cuối. Các thành phần cấu thành lên mô hình trong hình 3-1 sẽ được trình bày chi tiết trong những mục bên dưới.</p>
+<img src="./images/FIG03-01.jpg"/>
+<h4 align="center"><a name="fig03-01">Hình 3-1: Mô hình phân tích Data Stream tổng quan</a></h4>
+<h3 class="subheader1">3.1.2.	Tính chất nổi bật của hệ thống</h3>
+<p>Hệ thống được thiết kế dựa trên những frameworks mạnh mẽ với nhiều ưu điểm nổi trội, vì vậy mô hình thiết kế này không những thừa hưỡng những ưu điểm của những frameworks cấu thành lên nó, mà còn giúp tăng hiệu năng trong quá trình phân tích Data Stream và hiển thị kết quả cho người dùng cuối. Một số tính chất nổi bật của hệ thống được trình bày ngắn gọn như sau:</p>
+<ul>
+<li>Truyền tải và xử lý dữ liệu lớn trong thời gian ngắn</li>
+<li>Độ nhiễu thấp</li>
+<li>Tính mở rộng cao</li>
+<li>Có khả năng chịu tải cao khi gặp tình huống bursty</li>
+<li>Hổ trợ việc khôi phục các nodes khi bị lỗi hoặc mất kết nối</li>
+<li>Đảm bảo việc sử lý dữ liệu một lần duy nhất</li>
+<li>Truy vấn dữ liệu một các dễ dàng</li>
+</ul>
+<h2><a name="3.2">3.2.	Mô hình thiết kế chi tiết các thành phần trong hệ thống</a></h2>
+<h3 class="subheader1">3.2.1.	Hệ thống quản lý việc phối hợp xử lý và cấu hình dịch vụ</h3>
+<p>Trong hầu hết các hệ thống phân tán cần phải chia sẻ Metadata giữa các nodes với nhau. Metadata thông thường là những loại thông tin cấu hình dịch vụ, như là: vị trí của các cơ sở liệu, hay các node master-slave thường cần lưu vết lại các hoạt động của các nodes con của nó. Vì thế, vấn đề đặt ra là làm sao để quản lý những nhu cầu này trong một hệ thống phân tán.</p>
+<p>&#9733 <b> Một số vấn đề phổ biến trong việc duy trì hoạt động đồng thời trong hệ thống phân tán</b></p>
+<p>Có nhiều nguyên nhân làm mất tính đồng thời trong một hệ thống phân tán. Tuy nhiên, ta có thể chia ra thành 2 nhóm vấn đề chính [1] là Unreliable Network Connnection và Clock Synchronization.</p>
+<ul>
+<li><b>Unreliable Network Connection</b> là việc các nodes không thể giao tiếp được với nhau do mất liên kết, hoặc giao tiếp không liên tục do bị nhiễu. Có 4 nguyên nhân chính gây ra mất kết nối giữa các nodes là Latency, Split brain, Deadlock, Race condition
+</li>
+<li><b>Clock Synchronization</b> là việc bất đồng bộ hóa thời gian giữa các nodes. Nó thì rất đơn giản trên một node, nhưng trên hệ thống phân tán nhiều nodes thì nó một vấn đề rất phổ biến. Trong những Streaming System, việc chênh lệch thời gian giữa các sự kiện truyền vào sẽ gây ra mất ngữ nghĩa dữ liệu và cho ra kết quả sai.</li>
+</ul>
+<p>Trong hầu hết các hệ thống phân tán cần phải chia sẻ Metadata giữa các nodes với nhau. Metadata thông thường là những loại thông tin cấu hình dịch vụ, như là: vị trí của các cơ sở liệu, hay các node master-slave thường cần lưu vết lại các hoạt động của các nodes con của nó. Vì thế, vấn đề đặt ra là làm sao để quản lý những nhu cầu này trong một hệ thống phân tán.</p>
+<p>&#9733 <b> Apache ZooKeeper trong hệ thống khai thác Data Stream</b></p>
+<p>Dự án ZooKeeper (ZK) được phát triển bởi Yahoo, mục tiêu để cung cấp một dịch vụ nhằm giải quyết các vấn đề đã được nêu bên trên trong hệ thống phân tán. </p>
+<p>Hình 3-2 thể hiện sự liên kết giữa ZK và các thành phần khác trong hệ thống khai thác Data Stream. Hệ thống ZK này bao gồm 3 server riêng biệt, trong đó 2 nodes là follower và 1 node leader. Những nodes còn lại là những client của ZK, những nodes đó sẽ giao tiếp với ZK server để thực hiện việc liên kết và trao đổi thông tin cấu hình cho nhau. Node leader có nhiệm vụ ghi lại tất cả Metadata mà các clients gửi về, followers sẽ là cầu nối cho các clients đọc các dữ liệu được lưu trữ bên trong ZK. Ngoài khả năng duy trì sự thống nhất cho toàn hệ thống, ZK còn là nơi lắng nghe và gửi thông báo. Các client sẽ liên tục gửi các heartbeat  về cho ZK để nó nhận biết được việc 1 node nào đó bị mất kết nối với hệ thống. Từ đó, nó sẽ thực thi việc tạo lại kết nối cho node bị mất và liên kết nó vào lại hệ thống.</p>
+<img src="./images/FIG03-02.jpg"/>
+<h4 align="center"><a name="fig03-02">Hình 3-2: Mô hình thiết kế ZooKeeper trong hệ thống</a></h4>
+<p>Trong mô hình bên trên, chúng tôi dùng 3 server riêng biệt để làm ZooKeeper cluster để nhằm đảm bảo hệ thống ZK luôn hoạt động và có hiệu năng tối ưu hơn trong trường hợp ta tích hợp thêm nhiều nodes. ZK là kênh giao tiếp chính giữa các nodes với nhau, vì thế nếu ZK bị sập toàn hệ thống sẽ bị ảnh hưởng nghiêm trọng. Trong trường hợp 1 node trong ZK cluster bị mất kết nối, ZK sẽ thực hiện việc tái cân bằng lại ZK cluster, nhằm đảm bảo hệ thống luôn ổn định.</p>
+<h3 class="subheader1">3.2.2.	Thành phần quản lý và phân phối dữ liệu</h3>
+<p>Việc thu thập và xử lý dữ liệu lớn được phát ra từ nhiều nguồn với cường độ cao đặt ra không ích khó khăn và thách thức trong việc phát triển một hệ thống khai thác Data Stream. Thông thường thời gian xử lý một đơn vị dữ liệu thấp hơn thời gian dữ liệu được truyền vào, trong một số trường hợp lượng dữ liệu đổ về quá nhiều sẽ gây ra tình trạng tắc nghẽn làm mất mác dữ liệu hoặc sập hệ thống. Do đó, một hệ thống mạnh mẽ phải có khả năng giải quyết khi xảy ra việc bùng nổ dữ liệu. Bên cạnh đó, ta cần một nơi làm việc như một nguồn dữ liệu cục để cấp phát dữ liệu liên tục cho nhiều ứng dụng khác nhau trong hệ thống. Dựa trên những nhu cầu đó, Apache Kafka ra đời nhằm giải quyết những vấn đề trên.
+</p>
+<p>&#9733 <b> Apache Kafka</b></p>
+<p>Apache Kafka được phát triển bởi LinkedIn nhằm giúp việc truyền tải dữ liệu giữa những dịch vụ web và kho dữ liệu bên trong hệ thống. Mục tiêu của Kafka là để giải quyết các vấn đề trong việc truyền tải dữ liệu lớn với tốc độ cao giữa nhiều dịch vụ khác nhau trong hệ thống khai thác Data Stream. Sau đây, chúng tôi sẽ giới thiệu ngắn gọn những thành phần quan trọng trong một Kafka cluster.</p>
+<img src="./images/FIG03-03.jpg"/>
+<h4 align="center"><a name="fig03-03">Hình 3-3: Mô hình kiến trúc của một Kafka single node [9] </a></h4>
+<p>Hình 3-3 là mô hình Kafka single node, mô hình gồm 4 thành phần chính là ZooKeeper, Producers, Consumers, và Brokers. Kafka cluster khi triển khai luôn cần sự giúp đỡ từ ZooKeeper để trao đổi thông tin giữa Brokers và Consumers. Dữ liệu sẽ được phun ngẫu nhiền từ các Producers lên hệ thống Kafka để thực hiện phân luồng dữ liệu và trả về cho các Comsumers đang lắng nghe bên trong hệ thống. Khi dữ liệu được truyền lên phải được gắn vào một topic cụ thể, topic này sẽ được Kafka lưu trữ bên trong ZooKeeper để có thể đồng bộ với các Nodes khác.</p>
+<table style="margin-left: 30px;">
+<tr>
+<th>Broker</th>
+<td>Thành phần xử lý vật lý, những Brokers này làm nên một Kafka cluster. Thông thường, một Broker tương ứng với 1 server vật lý</td>
+</tr>
+<tr>
+<th>Partition</th>
+<td>được dùng đễ tổ chức một topic cho hợp logic. Mỗi Broker sẽ chứa 1 hay nhiều partitions. Khi producer thực hiện việc phun dữ liệu, Kafka sẽ tự động chọn partitions để ghi dữ liệu vào ổ cứng vật lý tại Broker đó</td>
+</tr>
+<tr>
+<th>Producer</th>
+<td>Thành phần thu thập và phun dữ liệu lên các Brokers, nó có thể lấy hoặc nhận dữ liệu từ các nguồn bên ngoài như Log-file, ….</td>
+</tr>
+<tr>
+<th>Consumer</th>
+<td>thành phần nhận dữ liệu từ các Broker trả về. Thông thường các consumers sẽ được tính hợp vào trong thành phần xử lý dữ liệu</td>
+</tr>
+<tr>
+<th>Topic</th>
+<td>Thành phần tổ chức dữ liệu trong Kafka, nơi chứa những dữ liệu có liên quan mật thiết với nhau. Một topic có thể lưu trong nhiều partitions trên những server khác nhau nhằm phục vụ quá trình xử lý song song</td>
+</tr>
+</table>
+<p>Kafka không phải là một hệ thống truy vấn trên dữ liệu Log, và khi đã tiêu thụ dữ liệu, thì dữ liệu đó sẽ không bị xóa như những hệ thống khác. Như ta đã biết, một topic có thể có nhiều partitions và việc ghi dữ liệu vào những partitions này thì không theo một thứ tự nhất định. Vì vậy, dữ liệu được Kafka trả về sẽ không đảm bảo thứ tự ngữ nghĩa.</p>
+<p>&#9733 <b> Apache Kafka trong hệ thống khai thác Data Stream</b></p>
+<p>Mô hình Kafka được thiết kế trong kiến trúc khai thác Data Stream tương tự như mô hình mẫu được trình bày bên trên, với 3 brokers được cài đặt trong một node, mỗi broker sẽ quản lý 1 partition. Mô hình được trình bày như hình 3-4.</p>
+<p>Trong mô hình trên, dữ liệu đi từ nhiều nguồn khác nhau và cùng đỗ về 3 Brokers trong Kafka server. Kafka hổ trợ 2 cơ chế để phun dữ liệu từ các Producers lên Brokers là async, và sync. Cơ chế sync là cơ chế gửi gói tin đảm bảo, nghĩa là khi nhận được các message   gửi lên Broker sẽ gửi xác nhận quá trình gửi thành công cho các Producers, trong thời gian này thì Producer sẽ chờ tới khi nhận xác nhận gửi thành công mới thực hiện tiếp. Trong khi đó, async không cần chờ việc hồi đáp từ Broker, nó thực hiện gửi message liên tục lên các Brokers. Vì vậy, thời gian gửi message bằng giao thức sync sẽ lâu hơn nhiều so với async. Tuy nhiên, việc gửi bằng async sẽ bị độ nhiễu cao, và dễ mất message.</p>
+<img src="./images/FIG03-04.jpg"/>
+<h4 align="center"><a name="fig03-04">Hình 3-4: Mô hình thiết kế Kafka trong hệ thống</a></h4>
+<p>Mô hình trên thiết kế với 3 Brokers để nhằm tăng khả năng nhận các messages từ các Producers gửi về hệ thống. Việc nay làm tăng tốc độ truyền tải dữ liệu vào bên trong hệ thống gấp 3 lần, cho việc dù ta dùng cơ chế async hay sync đều vậy.</p>
+<p>Topologies là những ứng dụng dùng để xử lý Data Stream được cài đặt bên trong Storm cluster. Những topologies này được cài đặt thành phần Kafka consumer vào bên trong để thực hiện việc hút dữ liệu từ Kafka cho quá trình phân tích dữ liệu. Những thông tin cấu hình, tạo kết nối giữa Topology và Kafka sẽ được ZooKeeper hổ trợ thông qua Metadata bên trong ZooKeeper.</p>
+<h3 class="subheader1">3.2.3.	Hệ thống xử lý Data Stream</h3>
+<p>Có rất nhiều phương pháp khác nhau để phân tích Data Stream, một trong những phương pháp đơn giản đó là xây dựng một ứng dụng phân tích Data Stream trực tiếp mà không cần sự trợ giúp của những công nghệ hiện đại. Tuy nhiên, phương pháp này sẽ không khả thi trong việc phân tích dữ liệu lớn, mặc dù phương pháp này tuy đơn giản những lại tìm ẩn nhiều nguy cơ. Một phương pháp tiên tiến hơn là ứng dụng Hadoop để khai thác dữ liệu lớn thông qua cơ chế Map-Reduce. Mặc dù phương pháp này làm việc rất hiệu quả trong hầu hết các trường hợp, nhưng lại bị điểm khuyết vì độ trễ quá cao trong việc thực thi 1 job. Điều này làm mất đi tính chất quan trọng high-availability của của một hệ thống phân tích Data Stream. Vì vậy, ta cần một hệ thống có khả năng xử lý dữ liệu lớn trong thời gian thực. </p>
+<p>&#9733 <b> Xử lý dữ liệu với Apache Storm</b></p>
+<p>Apache Storm là một framework mã nguồn mở, nó là một hệ thống tính toán dữ liệu phân tán real-time. Storm làm việc tính toán trên Data Stream được dể dàng và hiệu quả, và có thể được triển khai trên nhiều ngôn ngữ khác nhau. Storm có 4 đặc tính nổi bật [7] là khả năng mở rộng và sử lý dữ liệu lớn, khả năng chịu lỗi, và đảm bảo việc xử lý trọn vẹn dữ liệu. </p>
+<img src="./images/FIG03-05.jpg"/>
+<h4 align="center"><a name="fig03-05">Hình 3-5: Mô hình tổng quan của Storm Cluster [1]</a></h4>
+<p>Storm cluster được cấu thành từ 3 thành phần chính là Nimbus, Supervisors, và ZooKeeper cluster như hình 3-5. Hình bên dưới trình bày mô hình tổng quan của một Storm cluster với 3 nodes ZooKeeper và 3 Supervisors. Trong đó, ZooKeeper đóng vai trò là nơi hổ trợ Nimbus quản lý các Supervisors. ZooKeeper làm nhiệm vụ lưu vết lại các thông tin của các mẫu Topologies hoạt động trên Storm, và lưu trữ tình trạng hoạt động của các Supervisors.</p>
+<p>Trước hết, chúng tôi sẽ giới thiệu một số khái niệm quan trọng trong Storm cluster [6].</p>
+<p><b>Nimbus</b>: là một thành phần quan trọng nhất trong hệ thống Storm cluster, nó đảm nhận nhiều công việc khác nhau như là:</p>
+<ul>
+<li>Chịu trách nhiệm cho việc chia tán công việc cụ thể cho các spouts hoặc bolts thông quá các workers trong cluster</li>
+<li>Bên cách đó, nó còn chịu trách nhiệm tái cân bằng storm cluster trong trường hợp một trong những supervisor bị sập</li>
+<li>Nimbus không tham gia trực tiếp việc xử lý của các supervisors, mà nó chỉ phân chia công việc cho các supervisors</li>
+<li>Trong trường hợp Nimbus bị sập, storm cluster sẽ không còn khả năng quản lý các Topologies và các Supervisors, vì thế ta phải khởi động lại Nimbus</li>
+</ul>
+<p>Supervisor: là những nodes con được quản lý bởi Nimbus, đây là nơi thực hiện các công việc xử lý dữ liệu cho toàn bộ hệ thống</p>
+<ul>
+<li>Supervisors quản lý các workers, nhằm đảm bảo workers luôn hoạt động</li>
+<li>Nimbus thực hiện việc phân chia công việc cho các worker, và những Supervisors thực hiện việc quản lý những workers này</li>
+</ul>
+<p>Bảng 3-1 bên dưới trình bày một số khái niệm khác trong Storm cluster, 8 thành phần bên dưới là những khái niệm cơ bản trong Storm. Những khải niệm này để hổ trợ cho những thảo luận sâu hơn bên dưới về mô hình thiết kế Storm cluster và mô hình triển khai các ứng dụng phân tích Data Stream với Storm cluster trong những mục bên dưới.</p>
+<table border="1" align="center">
+<tr>
+<th>Topology</th>
+<td>Một ứng dụng logic cho việc xử lý Data Stream sẽ được đóng gói bên trong một Storm topology. Topology tương tự như một MapReduce job, nhưng Topology chạy mãi không bao giờ dùng, trong khi đó MapReduce sẽ dùng khi thực hiện hết công việc
+Topology chứa các spouts và bolts, những thành phần này được liên kết với nhau bởi Stream grouping. Topology là mẫu thiết kế cơ bản của Storm so với Trident
+</td>
+</tr>
+<tr>
+<th>Trident</th>
+<td>Trident là một mẫu thiết trừu tượng cho việc tính toán real-time dựa trên đỉnh của Storm. Nó cho phép xử lý dữ liệu với tốc độ cao, và hổ trợ truy vấn phân tán với độ nhiễu thấp, xử lý thống nhất trên nhiều nodes, và khả năng đảm bảo xử lý dữ liệu 1 lần duy nhất
+Trident hổ trợ một số hàm thực thi như joins, aggregations, grouping, function, những hàm này sẽ được trình bày trong những mục sau
+</td>
+</tr>
+<tr>
+<th>Tuple</th>
+<td>Tuple là một đối tượng chứa dữ liệu được truyền và xử lý trong nội bộ Storm cluster</td>
+</tr>
+<tr>
+<th>Spouts</th>
+<td>Một spout là một nguồn dữ liệu trong mẫu Topology. Nó thực hiện việc đọc dữ liệu từ những nguồn bên ngoài và phun vào Topology</td>
+</tr>
+<tr>
+<th>Bolts</th>
+<td>Là thành phần xử lý dữ liệu trong Topology, sau khi được spout cung cấp dữ liệu</td>
+</tr>
+<tr>
+<th>Stream grouping</th>
+<td>Stream grouping định nghĩa việc làm thế nào để phân chia Data Stream giữa các Bolts </td>
+</tr>
+<tr>
+<th>Worker</th>
+<td>Một Topology thực hiện việc xử lý thông qua một hoặc nhiều worker. Từng worker là một đơn vị xử lý vật lý JVM  . Một Supervisor (physical machine) có một hoặc nhiều JVM</td>
+</tr>
+<tr>
+<th>Task</th>
+<td>Từng spout hoặc bolt sử lý nhiều tasks thông qua Storm cluster. Mỗi task tương ứng với một thread xử lý</td>
+</tr>
+</table>
+<h4 align="center"><a name="tab03-01">Bảng 3-1: Một số khai niệm trong Storm Cluster</a></h4>
+<p>&#9733 <b> Apache Storm trong hệ thống khai thác Data Stream</b></p>
+<p>Trong mô hình thiết kế như hình 3-6 bên dưới, chúng tôi xây dựng 1 Storm cluster với 3 nodes trên 3 server vật lý, 1 node dùng làm Nimbus và 2 nodes làm Supervisors. Những nodes này được giao tiếp với nhau thông qua ZooKeeper cluster được trình bày bên trên. Bên cạnh đó để hổ trợ việc lưu trữ lại kết quả sau khi xử lý chúng tôi tích hợp thêm vào mỗi Supervisor một RedisDB, phần này sẽ được trình bày chi tiết hơn ở mục tiếp theo.</p>
+<img src="./images/FIG03-06.jpg"/>
+<h4 align="center">Hình 3-6: Mô hình thiết kế Storm cluster trong hệ thống</h4>
+<p>Trong mẫu thiết kế này, chúng tôi chỉ dùng 2 nodes làm supervisors, và trong mỗi supervisor tích hợp thêm 1 RedisDB. Tuy nhiên, trong thực tế tùy vào nhu cầu thực tế mà ta có thể thêm vào nhiều nodes hơn để nhằm gia tăng hiệu năng của hệ thống xử lý Data Stream. Việc thêm node này được thực hiện một cách dễ dàng bằng việc ta cấu hình dịch vụ, và gọi thực rebalance từ commandline thì Nimbus sẽ tự động thêm node vào trong cluster. Tuy nhiên, một điều ta nên lưu ý về khả năng chịu tải của ZooKeeper, ở đây chúng tôi chỉ dùng 3 node làm ZooKeeper cluster vì vậy khi thêm nhiều nodes hơn nữa nên chú ý tới việc thêm một số node cho ZooKeeper cluster để tăng khả năng chịu tải của nó.</p>
+<p>Một điểm đáng chú ý trong hệ thống Storm cluster này là khả năng fault-tolerent. Khác với Hadoop, trong trường hợp JobTracker sập thì toàn bộ công việc đang thực thi sẽ bị mất, nhưng trong Storm cluster khi Nimbus sập thì các công việc vẫn được thực thi bình thường. Bởi vì, thay vì Nimbus quản lý tất cả các workers như JobTracker trong Hadoop thì Supervisor sẽ đảm nhận việc này. Tuy nhiên, trong trường hợp Supervisor bị sập thì tất cả các công việc đang được xử lý trong node đó sẽ bị mất, và Nimbus sẽ thực hiện việc phân lại những việc đó cho những workers khác.</p>
+<h3 class="subheader1">3.2.4.	Hệ thống lưu trữ dữ liệu phân tán</h3>
+<p>Như đã trình bày bên trên về khả năng xử lý dữ liệu lớn thơi gian thực của Storm cluster. Nhưng để làm được điều này ta phải đảm bảo rằng việc lưu trữ dữ liệu sau khi đã được xử phải được thực một cách nhanh nhất có thể, để đảm bảo rằng nó không làm gián đoạn việc xử lý của toàn hệ thống. Bởi vì, trong mô hình Trident thực hiện việc xử lý dữ liệu đảm bảo, một task chỉ được thực thi khi task trước đó đã được thực thi xong. Vì thế, ta cần một CƠ SỞ DỮ LIỆU có khả năng lưu trữ dữ liệu nhanh với độ nhiễu thấp.</p>
+<p>Trong một số mẫu thiết kế trước đây, dữ liệu thường được lưu trữ bởi một cơ sở dữ liệu bên ngoài hệ thống. Điều này làm độ trễ cao do chi phí thời gian truyền dữ liệu giữa các server với nhau, bên cạnh đó để đảm bảo không bị mất mác dữ liêu khi truyền thường các frameworks sẽ thực hiện việc cơ chế sync . Do đó, thời gian truyền tải và lưu trữ dữ liệu sẽ lâu hơn thời gian Storm xử lý 1 đơn vị dữ liệu. Dựa trên những khuyết điểm này, chúng tôi đóng góp một mô hình lưu trữ dữ liệu phân tán thông qua công cụ Redis Cluster. Những cơ sở dữ liệu Redis này được cài đặt ngay bên trong những con server chạy Supervisor, việc này làm cho giảm đáng kể chi phí truyền dữ liệu, nhằm tăng hiệu năng lưu trữ cho cho các workers. Tuy nhiên, trong hệ thống xử lý dữ liệu phân tán ta sẽ gặp vấn đề về việc đồng bộ các cơ sở dữ liệu Redis lại với nhau thành một cơ sở dữ liệu thống nhất. Hình 3-7 là mô hình thiết kế Redis Cluster được tích hợp vào bên trong hệ thống xử lý Data Stream.</p>
+<p>Trong phiên bản mới công bố [8], Redis chính thức hổ trợ khả năng truy vấn dữ liệu trong một cụm các cluster được phân tán trên nhiều server khác nhau mà vẫn giữ được hiệu năng cao. Nhờ vào sự phát triển này, vấn đề thống nhất dữ liệu trên nhiều nodes khác nhau đã được giải quyết. Hơn nữa, việc này giúp cho truy vấn dữ liệu trên Storm cluster dễ dàng hơn, bởi vì các RedisDB được cài đặt ngay trong các server thực thi của Storm nên giảm được chi phí truyền tải dữ liệu, khả năng đọc ghi bằng Redis nhanh hơn hẳn các cơ sở dữ liệu khác.</p>
+<img src="./images/FIG03-07.jpg"/>
+<h4 align="center"><a name="fig03-07">Hình 3-7: Mô hình thiết kế Redis cluster trong hệ thống</a></h4>
+<p>Trong mô hình được trình bày bên trên, chúng tôi cài đặt Redis trên server chạy NodeJS để thực hiện việc truy vấn dữ liệu nhanh hơn, và nó là cầu nối với những cơ sở dữ liệu khác nằm trong những Supervisors của hệ thống Storm cluster.</p>
+<p>3.2.5.	Thành phần phân tán dữ liệu</p>
+<p>NodeJS server chịu trách nhiệm lấy dữ liệu từ Redis Cluster và dùng những thông tin này trình diễn ra những real-time report tương ứng. Để giao tiếp giữa webserver và client, chúng tôi sử dụng thư viện Javascript socket.io . Trong khi websocket, một giao thức bắt tay giữa client và server, vẩn còn đang phát triển và còn nhiều hạn chế  [10] như là chỉ được hổ trợ cho một số trình duyệt mới và vấn đề khác firewalls và proxies ngăn chặn kết nối của websocket. Thư viện socket.io có thể chạy tốt trên hầu hết các trình duyệt được sử dụng phổ biến hiện tại và không bị chặn bởi proxies hay firewalls. Bên cạnh đó, socket.io cũng hổ trợ nhiều API giúp cho việc lập trình trở nên dễ dàng hơn. </p>
+<p>Chúng tôi sẽ sơ lược về cách hệ thống sẽ phân tán dữ liệu. Giả sử, hệ thống Data Stream hoạt động và dữ liệu được cập nhật liên tục vào RedisCluster. Sau mỗi thời gian ngắn, RedisDb Cluster sẽ sử dụng cơ chế publisher/subscriber để thông báo về dữ liệu mới cập nhật cho NodeJs server, mà đang lắng nghe thông tin từ Redis. Khi nhận được thông tin cập nhật, với cơ chế event-drivent, NodeJs sẽ gọi hàm callback để broadcast dữ liệu mới cập nhật cho tất cả client đang kết nối thông qua socket.io. Dữ liệu mới được client trình diễn ra dưới dạng real-time report.</p>
+<h2><a name="3.3">3.3.	Cài đặt và tích hợp thuật toán</a></h2>
+<p>Trong mục này, chúng tôi sẽ trình bày mô hình tích hợp 2 thuật toán khai thác tập phổ biến trên Data Stream vào hệ thống đã được trình bày trong những mục trên. Mô hình này được xây dựng dựa trên mẫu thiết kế Trident và tính năng truy vấn dữ liệu trên hệ thống phân tán thông qua Redis Cluster. Nội dung của 2 thuật toán này được trình bày chi tiết trong chương 5 và 6.</p>
+<h3 class="subheader1">3.3.1.	Mô hình tích hợp thuật toán vào hệ thống</h3>
+<p>Mô hình tích hợp thuật toán được chúng tôi thiết kế trên mẫu Trident, việc làm này đem lại 3 ưu điểm:</p>
+<ul>
+<li>Việc truyền tải và xử lý dữ liệu bằng mẫu Trident nhanh hơn mẫu thiết kế cơ bản Topology</li>
+<li>Trident hổ trợ cơ chế OpaqueTridentKafkaSpout giúp đảm bảo tất cả dữ liệu được xử lý một lần duy nhất. Điều này giúp tránh việc mất mác dữ liệu trong quá trình truyền, và việc xử lý không bị lặp lại trên cùng một đối tượng dữ liệu</li>
+<li>Trident hổ trợ nhiều cơ chế mạnh mẽ khác của Storm, như việc truy vấn trực tuyến trên Data Stream bằng DRPC</li>
+</ul>
+<p>Trong mô hình 3-8 bên dưới mô tả quá trình xử lý dữ liệu theo mẫu Trident, dữ liệu được truyền từ KafkaCluster vào Storm thông qua thành phần KafkaSpout. Sau đó được phân tán một cách ngẫu nhiên ra những phân vùng  khác để xử lý. Sau đó được đổ về chung một nơi để thực hiện việc khai thác dữ liệu tại lớp FrequentPattern. Thành phần MetricCollector sẽ thực hiện việc thu thập những thông tin khác mà không cần đến những thuật toán phức tạp, như đếm số lượng tuple đã xử lý. Cuối cùng, sau khi đã khai thác những kết quả thu được sẽ được lưu trữ vào bên trong Redis Cluster để phục vụ cho những mục đích khác. Việc sử dụng Redis Cluster sẽ rất có lợi vì giảm chi phí truyền tải dữ liệu trên đường truyền, tốc độ lưu trữ cao, và vẫn đảm bảo tính nhất quán dữ liệu giữa các Nodes khác nhau.</p>
+<img src="./images/FIG03-08.jpg"/>
+<h4 align="center"><a name="fig03-08">Hình 3-8: Mô hình tích hợp thuật toán vào Storm theo mẫu thiết kế Trident</a></h4>
+<p>Như đã thấy, tại giai đoạn (2) ta có thể khai báo cho Storm thực hiện việc sử lý song song trên nhiều executors   khác nhau để tăng hiệu năng sử lý dữ liệu lớn. Tuy nhiên, giai đoạn (3) tất cả kết quả đã xử lý phải được kết hợp lại thành một phân vùng để thực hiện việc khai thác tập phổ biến. Việc này là một khuyết điểm lớn, nó làm mất đi tính năng xử lý song song của Storm. Lý do chúng tôi làm vậy bởi vì 2 thuật toán được trình bày tại chương 5,6 không hổ trợ việc sử lý song song, cho nên tất cả dữ liệu đã được xử lý trong những thành phần trước phải được đổ về 1 nơi để thực hiện việc khai thác dữ liệu.</p>
+<h3 class="subheader1">3.3.2.	Cài đặt tích hợp thuật toán vào trong hệ thống</h3>
+<p>Để thực hiện việc tích hợp những thuất toán về khai thác mẫu phổ biến được dễ dàng hơn, chúng tôi xây dựng lớp interface chung cho các thuật toán có thể triển khai mà không cần quan tâm nhiều đến việc tích hợp vào những Aggregations  của Storm. Hình 3-9 trình bày cách làm của chúng tôi, với việc tích hợp 2 thuật toán TwMinSwap và Skip LC-SS</p>
+<img src="./images/FIG03-09.jpg"/>
+<h4 align="center">Hình 3-9: Lớp interface tích hợp thuật toán</h4>
+<p>Thông qua việc khảo sát nhiều thuật toán phổ về khai thác mẫu phổ biến. Chúng tôi thấy rằng những thuật toán này cần truyền một hoặc một vào các siêu tham số để thực thi thuật toán, đầu ra của những thuật toán này thường là một danh sách các item/itemset và độ phổ biến của chúng. Từ đó, chúng tôi xây dựng 1 lớp chung cho các thuật toán để dễ dàng hơn khi tích hợp vào Storm.</p> 
+</body>
+</html>

@@ -1,0 +1,102 @@
+<html>
+<head>
+<meta charset="UTF-8">
+<link rel="stylesheet" type="text/css" href=".\thesis.css">
+</head>
+<body>
+<h1>CHƯƠNG 7:	THỰC NGHIỆM</h1>
+<p class="abstract">Trong chương này, luận văn trình bày các thực nghiệm để kiểm tra kết quả và hiệu năng khai thác bằng việc chạy 2 thuật toán TwMinSwap và Skip LC-SS đã được trình bày bên trên, bằng mô hình khai thác dữ liệu dòng được trình bày chương 3.</p>
+<h3>Các mục chính trong chương:</h3>
+<p><a href="#7.1">7.1.	Bộ dữ liệu thử nghiệm</a></p>
+<p><a href="#7.2">7.2.	Thiết lập môi trường thử nghiệm</a></p>
+<p><a href="#7.3">7.3.	Khai thác dữ liệu trực tuyến</a></p>
+<p><a href="#7.4">7.4.	Hiệu năng sử lý của hệ thống với thuật toán TwMinSwap</a></p>
+<h2><a name="7.1">7.1.	Bộ dữ liệu thử nghiệm</a></h2>
+<p>Luận văn sẽ thử nghiệm trên 2 loại dữ liệu là item và itemset, với từng loại sẽ dùng 1 bộ dữ liệu riêng. Bộ dữ liệu food-review sẽ được dùng cho item và retail data dùng cho itemset, những bộ dữ liệu trên được tải về từ 2 nguồn dữ liệu uy tín là Stanford [35] và fimi [36] . Các thông tin trong bảng 7.1 và 7.2 là đặc điểm các tập dữ liệu, trong đó bao gồm tổng số review (#review), tổng số item phân biệt (#items), tổng số giao dịch (#Trans), và một số thông tin khác.</p>
+<table border="1" align="center">
+<tr>
+<th>Đặc điểm</th>
+<th>Số liệu</th>
+</tr>
+<tr>
+<td>Tổng số dòng (#review)</td>
+<td>568.454</td>
+</tr>
+<tr>
+<td>Số lượng items khác nhau (#items)</td>
+<td>74.258</td>
+</tr>
+<tr>
+<td>Kích thước của một record (byte)</td>
+<td>70</td>
+</tr>
+</table>
+<h4 align="center"><a name="tab07-01">Bảng 7-1: Đặc điểm của tập dữ liệu movie-review cho loại dữ liệu item</a></h4>
+<table border="1" align="center">
+<tr>
+<th>Đặc điểm</th>
+<th>Số liệu</th>
+</tr>
+<tr>
+<td>Số lượng giao dịch (#trans)</td>
+<td>88.163</td>
+</tr>
+<tr>
+<td>Số lượng items khác nhau (#items)</td>
+<td>16.470</td>
+</tr>
+<tr>
+<td>Độ dài tối đa của 1 giao dịch (item)</td>
+<td>76</td>
+</tr>
+</table>
+<h4 align="center"><a name="tab07-02">Bảng 7-2: Đặc điểm của tập dữ liệu webdoc cho loại dữ liệu itemset</a></h4>
+<p>Tất cả các thử nghiệm đều được triển khai dựa trên mô hình hệ thống khai thác Data Stream đã được trình bày chi tiết trong chương 3, và được thiết lập môi trường thử nghiệm được đề cập chi tiết trong mục tiếp theo.</p>
+<h2><a name="7.2">7.2.	Thiết lập môi trường thử nghiệm</a></h2>
+<p>Hệ thống server được xây dựng giả lập trên phần mềm VMware workstation 9, bao gồm 6 server vật lý chạy trên hệ điều hành Ubuntu Sever 14.04, với cấu hình Intel 1 core và 1GB bộ nhớ cho từng server riêng biệt. Mô hình server vật lý của toàn hệ thống được mô như hình 7-1.</p>
+<img src="./images/FIG07-01.jpg"/>
+<h4 align="center"><a name ="fig07-01">Hình 7-1: Hệ thống khai thác Data Stream (physical layer)</a></h4>
+<p>Một server có thể chạy một hoặc nhiều các frameworks khác nhau, điều này giúp ta tiết kiệm được chi phí triển khai hệ thống mà vẫn đạt hiệu năng cao, bởi vì những thành phần tốn nhiều chi phí xử lý, như Supervisor, Brokers, NodeJS, Nimbus, được chúng tôi chia sẽ đều ra các server khác nhau. Như ta đã thấy, thành phần ZooKeeper được chia chạy trên 3 server vật lý riêng biệt, việc này nhằm đảm bảo ZK cluster luôn hoạt động và không bị mất kết nối với toàn hệ thống. Chúng ta phải làm vậy vì ZK cluster là thành phần quan trọng nhất của toàn hệ thống chi tiết đã được để cập trong chương 2.</p>
+<p>Trong những phần còn lại chúng tôi sẽ thử nghiệm hệ thống với việc tích hợp 2 thuật toán TwMinSwap và Skip LC-SS chạy trên Apache Storm version 0.9.5 với 1 worker trên 1 supervisor.</p>
+<h2><a name="7.3">7.3.	Khai thác dữ liệu trực tuyến</h2>
+<p>Mục này trình bày những thông tin hữu ích tìm ẩn trong Data Stream được khai thác bằng 2 thuật toán TwMinSwap và Skip LC-SS. Kết quả của việc khai thác này được thực hiện real-time và được hiển thị thông qua 2 công nghê visualization là NodeJS và D3.js [37]</p>
+<h3 class="subheader1">7.3.1.	Khai thác trên bộ dữ liệu food-review</h3>
+<p>&#9733 <b> Chủ đề khai thác</b></p>
+<p>Hiển thị top 10 food hay được review nhất.</p>
+<p>&#9733 <b> Ngữ cảnh</b></p>
+<p>Ngữ cảnh real-time report nằm trong một cửa hàng cung cấp thực phẩm. Họ sở hữu một trang web để giới thiệu những thực phẩm mà họ đang bán. Hàng ngày có rất nhiều khách hàng vào trang web của họ để để xem hay để mua hàng trực tuyến. Mỗi lần một người review một món hàng thì họ lại lưu lại thông tin của món hàng được review ấy. Những thông tin ấy rõ ràng không giúp được gì cho họ cho mục đích kinh doanh. Họ cần một real-time report có thể cho họ biết tại thời điểm này món hàng nào hay được review nhất. Với thông tin ấy, họ có điều chỉnh chính sách của mình tập trung vào món hàng đang được review ấy như là khuyến mãi khi mua số lượng, mua 2 tặng 1. Kết quả là họ thu được nhiều lợi nhuận hơn với real-report đó.</p>
+<p>&#9733 <b> Hiển thị kết quả khai thác dưới dạng real-time report:</b></p>
+<p>Kết quả khai thác được hiển thị dưới dạng biểu đồ cột. Có 10 cột tương ứng với 10 thực phẩm được review nhiều nhất kèm theo con số thể hiện mức độ review của chúng. Các cột được sắp theo thứ tự tăng dần mức độ quan tâm của người dùng. Hình 7-2 thể hiện kết quả của real-time report thể hiện 10 food hay được review nhất.</p>
+<img src="./images/FIG07-02.jpg"/>
+<h4 align="center"><a name ="fig07-02">Hình 7-2: Real-time report: Top 10 Foods hay được review nhất</a></h4>
+<h3 class="subheader1">7.3.2.	Khai thác trên bộ dữ liệu retail</h3>
+<p>&#9733 <b> Chủ đề khai thác</b></p>
+<p>Hiển thị các nhóm món hàng hay được mua chung trong các giao dịch.</p>
+<p>&#9733 <b> Ngữ cảnh</b></p>
+<p>Ngữ cảnh real-time report nằm trong cửa hàng bán lẻ. Mỗi ngày, có rất nhiều khác mua hàng tới mua hàng của họ. Sau khi thanh toán, họ thu được rất nhiều đơn hàng mà khách hàng của họ đã mua. Với thông tin giao dịch đã ghi nhận, cuối tháng họ report được số lượng hàng hóa đã được mua. Thông tin giúp họ biết được lượng hàng nào cần được nhập thêm hay hàng nào hay được mua. Thông tin ấy giúp ích cho mục đích kinh doanh. Liệu còn thông tin nào mà cửa hàng đã bỏ sót không khai thác. Có một số quy luật tiềm ẩn trong các đơn hàng mà bình thường không nhận ra được bằng mắt thường. Có một số món hàng rất hay được mua chung với nhau. Nếu biết được thông tin, cửa hàng có thể còn tăng doanh thu hơn vì để chung những vật hay được mua gần với nhau. Vi dụ như là áo sơ mi hay được mua chung với cà vạt, sẽ thật tốt khi cả hai ở gần nhau và người mua có thể mua ngay cả hai. Họ sẽ cần một report cho họ biết những thông tin này.</p>
+<p>&#9733 <b> Hiển thị kết quả khai thác dưới dạng real-time report:</b></p>
+<p>Kết quả khai thác được hiển thị dưới dạng biểu đồ quạt. Biểu đồ có nhiều lớp không đều. Mỗi lớp tương ứng với một item. Một đường đi từ lớp đầu tới lớp cuối tạo thành một itemset phổ biến. Hình 7-3 thể hiện kết quả của real-time report thể hiện nhóm món hàng hay được mua chung trong các giao dịch.</p>
+<img src="./images/FIG07-03.jpg"/>
+<h4 align="center"><a name="fig07-03">Hình 7-3: Real-time report: Các nhóm món hàng hay được mua chung trong các giao dịch</a></h4>
+<h2><a name="7.4">7.4.	Hiệu năng sử lý của hệ thống với thuật toán TwMinSwap</a></h2>
+<p>Thuật toán được chạy với 2 siêu tham số k = 100, và decay = 0.9 trên bộ dữ liệu food-review. Bằng việc cho tốc độ truyền tải dữ liệu thay đổi với những cường độ khác nhau trong từng lần chạy, ta sẽ đo đạt lại số lượng dữ liệu chưa được xử lý còn tồn động bên trong Kafka, để từ đó ược lượng khả năng sử lý tối đa của toàn hệ thống. Dữ liệu đầu vào của 3 lần chạy này tương đương nhau, và được chạy độc lập trên cùng một môi trường.</p>
+<p>&#9733 <b> Cách thực hiện thử nghiệm</b></p>
+<p>Chúng tôi thực hiện thử nghiệm 3 lần riêng biệt, với tốc độ phun dữ liệu lần lược là 12.000, 14.000, 15.000 record/s. Để tính số lượng dữ liệu còn tồn động lại trong Kafka mà chưa xử lý, chúng tôi viết một con bot để thực hiện việc thu thập dữ liệu tại Kafka và Storm trong mỗi 4 giây một lần, và ghi Log lại lượng dữ liệu tồn động trong mỗi 4 giây.</p>
+<p>&#9733 <b> Mục tiêu của việc thử nghiệm</b></p>
+<p>Mục tiêu của quá trình thực nghiệm này nhằm ước lượng khả năng xử lý tối đa có thể của thuật toán TwMinSwap khi được tích hợp vào hệ thống bên trên, để có thể cảnh bảo người quản trị khi hệ thống gần trạm tới ngưỡng quá tải. Việc này giúp người quản lý hệ thống có những biệt pháp nâng cập hệ thống hoặc ngăn chặn việc quá tải trước khi xảy ra.</p>
+<p>&#9733 <b> Kết quả thu được</b></p>
+<p>Hình 7-2 được phun với tốc độ 12.000 thì giá trị Max là 38.94, và sau đó lượng dữ liệu tồn động không vượt qua được ngưỡng này nữa, mà chỉ giao động lên xuống trong khoảng từ 13 tới 40. Ta có, sự giao động này bởi vì hệ thống Storm xử lý dữ liệu theo từng small batch , chứ không xử lý từng record một, kích thước của một small batch được Storm tự tính toán sao cho đạt hiệu năng tốt nhất, và ta không thể cấu hình cho việc này được</p>
+<img src="./images/FIG07-04.jpg"/>
+<h4 align="center"><a name="fig07-04">Hình 7-4: Hiệu năng của hệ thống tích hợp TwMinSwap - Tốc độ 12.000 (records/s)</a></h4>
+<p>Qua hình 7-2 cho thấy, với tốc độ này hệ thống vẫn hoạt động tốt, vì biểu đồ không có xu hướng tăng theo đường tuyến tính.</p>
+<img src="./images/FIG07-05.jpg"/>
+<h4 align="center"><a name="fig07-05">Hình 7-5: Hiệu năng của hệ thống tích hợp TwMinSwap - Tốc độ 15.000 (records/s)</a></h4>
+<p>Tuy nhiên, tại hình 7-3 khi ta tăng tốc độ lên 15.000 thì có một sự thay đổi rõ rệt. Lượng dữ liệu tồn đọng có xu hướng tăng liên tục theo đường tuyến tính. Điều này cho thấy, nếu tốc độ này vẫn không thay đổi thì dữ liệu tồn động sẽ càng ngày càng tăng, và độ trễ cũng tăng dần theo. </p>
+<p>Chúng tôi giảm tốc độ này xuống mức 14.000 records/s ra thu được kết quả như hình 7-4. Ta có thể thấy, ngưỡng Max là 51.26 và cao hơn ngưỡng Max khi ta chạy với tốc độ 12.000, điều này cho thấy với mỗi tốc độ khác nhau ta có một ngưỡng Max khác nhau. Tuy nhiên, với tốc độ phun dữ liệu như vậy thì hệ thống vẫn hoạt động bình thường, bởi vì lượng dữ liệu dồn chỉ giao động quanh mức 18 tới 52, và không có xu hướng tăng theo đường tuyến tính.</p>
+<img src="./images/FIG07-06.jpg"/>
+<h4 align="center"><a name="fig07-06">Hình 7-6: Hiệu năng của hệ thống tích hợp TwMinSwap - Tốc độ 14.000 (records/s)</a></h4>
+<p>&#9733 <b> Kết luận</b></p>
+<p>Qua 3 thử nghiệm trên, ta thấy được với hệ thống cấu hình thấp như trên và tích hợp thuật toán TwMinSwap thì ngưỡng xử lý tối đa sấp xỉ 14.000 record/s. Với tốc độ này trở xuống thì hệ thống vẫn hoạt động tốt, độ dồn ứ dữ liệu và độ trễ sẽ không tăng dần theo thời gian</p>
+<p>Dựa vào những số liệu này, ta có thể xây dựng một hệ thống giám sát để cảnh báo khi hệ thống sắp bị quá tải. Bên cạnh đó, ta có thể cải thiện hiệu năng sử lý của hệ thống bằng cách khai báo thêm nhiều workers khác cùng nhau xử lý song song cho một ứng dụng, hoặc tăng cấu hình phần cứng cho những server xử lý của Storm.</p>
+</body>
+</html>

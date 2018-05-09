@@ -1,0 +1,370 @@
+<html>
+<head>
+<meta charset="UTF-8">
+<link rel="stylesheet" type="text/css" href=".\thesis.css">
+<script type="text/x-mathjax-config">
+  MathJax.Hub.Config({tex2jax: {inlineMath: [['$','$'], ['\\(','\\)']]}});
+</script>
+<script type="text/javascript"
+  src="http://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML">
+</script>
+</head>
+<body>
+<h1>CHƯƠNG 4: TỔNG QUAN KHAI THÁC MẪU PHỔ BIẾN TRÊN DATA STREAM </h1>
+<p class="abstract">Trong chương này, chúng tôi sẽ trình bày tổng quan một số định nghĩa,
+vấn đề gặp phải trong việc khai thác data stream và ý nghĩa của nó. Chi tiết
+hơn nữa, chúng tôi trình bày về khái niệm data windows và định nghĩa hình
+thức cho bài toán khai khai thác mẫu phổ biến. Hai bài toán của khai thác
+mẫu phổ biến là khai thác item và itemset phổ biến, là đối tượng của khóa
+luận, cũng sẽ được trình bày trong chương này.</p>
+<h3>Các mục chính trong chương:</h3>
+<p><a href="#4.1">4.1. Giới thiệu về mẫu phổ biến, việc khai thác mẫu phổ biến trong Data Stream và ý nghĩa</a></p>
+<p><a href="#4.2">4.2. Data Windows</a></p>
+<p><a href="#4.3">4.3. Khai thác mẫu phổ biến: Định nghĩa</a></p>
+<p><a href="#4.4">4.4. Giới thiệu về mẫu phổ biến, việc khai thác mẫu phổ biến trong Data Stream và ý nghĩa</a></p>
+<p><a href="#4.5">4.5. Khai thác itemsets phổ biến trên data stream</a></p>
+<p><a href="#4.6">4.6. Thuật toán nền cho bài toán khai thác itemset phổ biến</a></p>
+<p><a href="#4.7">4.7. Kết luận</a></p>
+<h2><a name="4.1">4.1. Giới thiệu về mẫu phổ biến, việc khai thác mẫu phổ biến trong Data Stream và ý nghĩa</a></h2>
+<h3 class="subheader1">4.1.1. Mẫu phổ biến</h3>
+<p>Mẫu phổ biến (Frequent Pattern) [8] là các mẫu (tập các item, chuỗi con, các
+cấu trúc con, đồ thị con, …) xuất hiện trong tập dữ liệu một cách thường xuyên với
+tần suất không nhỏ hơn một ngưỡng cho trước. Ví dụ, một tập các item gồm sữa và
+bánh mì thường xuyên xuất hiện cùng nhau trong một tập dữ liệu lớn (lớn hơn n lần)
+được gọi là mẫu phổ biến. Một dẫy tuần tự các hành vi, chẳng hạn như “mua máy
+tính trước, sau đó mua máy camera kỹ thuật số, rồi đến thẻ nhớ”, nếu chuỗi hành vị
+này thường gặp trong cơ sở dữ liệu của cửa hàng thì đó là một dãy tuần tự phổ biến.
+Một cấu trúc như đồ thị, cây, dạng lưới xuất hiện thường xuyên trong dữ liệu, thì nó
+được gọi là mẫu có cấu trúc phổ biến.</p>
+<p>Việc tìm kiếm những mẫu phổ biến như vậy đóng vai trò quan trọng trong việc
+khai thác các luật kết hợp [9, 10]. Hơn thế nữa, nó còn giúp giải quyết các bài toán
+như phân loại, phân nhóm và nhiều bài toán KTDL khác [11, 12, 13]. Chính vì vậy,
+việc khai thác mẫu phổ biến hiện nay là một bài toán rất quan trọng trong lĩnh vực
+KTHL và là một chủ đề đáng quan tâm khi nghiên cứu về KTDL.</p>
+<h3 class="subheader1">4.1.2. Việc khai thác mẫu phổ biến trong Data Stream</h3>
+<p>Việc khai thác mẫu phổ biến là một nghiên cứu để tìm ra các mẫu xuất hiện nhiều
+lần trong một bộ dữ liệu. Bộ dữ liệu này có cấu trúc đa dạng, như là bộ dữ liệu text
+52
+document, bộ dữ liệu bán cấu trúc như là XML, hay bộ dữ liệu có cấu trúc phức tạp
+như là Graph. Ví dụ, ta cho một bộ dữ liệu về giao dịch, từng giao dịch chứa một
+itemset, khai thác mẫu phổ biến là việc tìm kiếm các các cặp item/itemset khác nhau
+mà xuất hiện nhiều hơn một giá trị cho trước gọi là độ support.
+Trong môi trường data stream, bài toán khai thác mẫu phổ biến là việc xử lý một
+chuỗi các phần tử một lần duy nhất và tìm ra các phần tử xuất hiện nhiều hơn số lần
+xuất hiện cho trước (thường là tỉ lệ phần trăm của kích thước dòng dữ liệu tính đến
+thời điểm hiện tại). Việc khai thác mẫu phổ biến trên dữ liệu dòng đặt ra 3 thách thức
+lớn [14], đó là:</p>
+<ul style="list-style-type:circle">
+  <li>Số lượng mẫu phát sinh tăng theo cấp số nhân, đòi hỏi phải có một giải thuật
+mới để khai thác như là việc tính toán xấp xỉ</li>
+  <li>Lượng bộ nhớ xử dụng phải được quản lý một cách hiệu quả, vì những thuật
+toán khai thác dòng đòi hỏi nhiều bộ nhớ hơn những thuật toán khai thác trên
+dữ liệu tĩnh</li>
+  <li>Những thuật toán phải cân bằng giữa thời gian xử lý và sử dụng bộ nhớ</li>
+</ul>
+<h3 class="subheader1">4.1.3. Ý nghĩa của việc khai thác tập mẫu phổ biến trên Data Stream</h3>
+<p>Ngày nay, ngày càng nhiều các ứng dụng như là mạng lưới giao thông, mạng xã
+hội, hệ thống giám sát và quá trình xử lý dữ liệu online như là thị trường chứng
+khoáng hay đơn thanh toán của các cửa hàng bán lẻ … tạo ra một lượng lớn dữ liệu
+dòng mỗi ngày. Việc tìm ra những mẫu phổ biến ẩn bên trong những dữ liệu này là
+cần thiết. Khác với cơ sở dữ liệu truyền thống, dòng dữ liệu điển hình tới một cách
+liên tục ở tốc độ cao với một lượng lớn và phân phối dữ liệu cũng thay đổi. Vì đặc
+trưng này của data stream, những kỹ thuật cho dữ liệu truyền thống mà yêu cầu nhiều
+lần duyệt toàn bộ dữ liệu không thể áp dụng trực tiếp vào việc khai thác data stream,
+mà luôn luôn chỉ cho phép 1 lần duyệt dữ liệu. Một hướng nguyên cứu về khai thác
+mẫu phổ biến trên dòng dữ liệu đã ra đời và thu hút nhiều sự quan tâm của những nhà
+khoa học vì tính thử thách cũng như sự cần thiết của nó. Đã có một số công trình
+nguyên cứu được đề xuất áp dụng những kết quả nguyên cứu về khai thác mẫu phổ
+53
+biến vào ứng dụng thực tế. Sau đây là ba ứng dụng chính của khai thác mẫu phổ biến
+[13].</p>
+<p><b>Theo dõi hiệu năng</b>: Theo dõi giao thông mạng và hiệu năng, xác định dị
+thường và sự xâm nhập, và dự đoán về ước lượng sự phổ biến của dòng gói tin trên
+internet khi có sự cố báo động từ dòng dữ liệu</p>
+<p><b>Theo dõi giao dịch</b>: Theo dõi nhưng giao dịch trong cửa hàng bán lẻ, máy
+ATM, và bản ghi Log thị trường chứng khoáng, bản ghi các cuộc gọi. Tìm mẫu phổ
+biến được áp dụng để theo dõi dòng nghiệp vụ để dự đoán sai sót hay tạo những report
+dựa trên dòng web log.</p>
+<p><b>Khai thác mạng lưới sensor</b>: Khai thác những mẫu phổ biến từ mạng lưới
+sensor hay camera giám sát và còn có thể ước lượng được giá trị thiếu.</p>
+<h2><a name="4.2">4.2. Data Windows</a></h2>
+<p>Trong môi trường data stream, những chuỗi đối tượng dữ liệu, dạng $T=(T_{1},T_{2},T_{3},...,T_{i},...)$
+, đến liên tục và không kết thúc. Kết quả của quá trình khai thác dựa trên
+những windows data được cập nhật liên tục theo thời gian. Một window là một chuỗi
+các giao dịch giữa i-th và j-th, được ký hiệu như sau $T_{ij}=(T_{i},T_{i+1},...,T_{j})$ với $i \leq j$
+. Mặc dù có rất nhiều cách để xác định một mô hình window, nhưng có 4 loại mô
+hình window phổ biến nhất là: Landmark window, Sliding window, Damped window,
+Time-tilted window [15].</p>
+<ul style="list-style-type:circle">
+<li><b>Landmark Window</b>: trong mô hình này chúng ta tìm kiếm mẫu phổ biến
+chứa trong window bắt đầu từ lúc khởi tạo Data Stream (s) tới thời điểm hiện
+tại ta xét (t)</li>
+<li><b>Sliding Window</b>: cho kích thước của một window (w) và thời gian hiện tại (t).
+Việc tìm những mẫu phổ biến theo mô hình này sẻ chỉ được xét trong window
+[ t – w +1, t ], window này sẽ được thay đổi liên tục theo thời gian t nhưng vẫn
+giữ nguyên giá trị w</li>
+</i><b>Damped Window</b>: mô hình này vừa cân nhắc những dữ liệu trong quá khứ,
+vừa cân nhắc những dữ liệu hiện tại nhưng ở những mức độ khác nhau. Nó
+phân phối trọng số cao hơn cho những dữ liệu gần đây và giảm trọng số những
+54
+dữ liệu trước đó, bằng cách xác định một decay rate δ (với 0 < δ <= 1). Khi
+một dữ liệu mới tới, những trọng số của dữ liệu trước đó sẽ nhân δ để giảm
+mức độ ảnh hưởng của nó.</li>
+<li><b>Time-Tilted Window</b>: việc khai thác mẫu phổ biến trên mô hình này dựa trên
+một bộ những window có độ dài khác nhau, và từng window tương ứng với
+những thời giản khác nhau</li>
+</ul>
+<h2><a name="4.3">4.3. Khai thác mẫu phổ biến: Định nghĩa</a></h2>
+<p>Mặc dù các khảo sát hay các bài tổng quan về khai thác mẫu phổ biến chỉ tập
+trung chỉ khai thác itemset phổ biến. Chúng tôi đưa ra một định nghĩa hình thức cho
+vấn đề khai thác mẫu phổ biến cho tất cả các mẫu bao gồm items, itemsets, chuỗi,
+cây và đồ thị [15].</p>
+<p>Cho $X = {x_{1},x_{2},...,x_{m}}$ là tập có thể có của items $x_(i)$. Một mẫu P là một chuỗi hay
+là một tập các items, với <b>P</b> là tất cả các mẫu P có thể mà chúng ta đang quan tâm.
+Một dòng dữ liệu T là một chuỗi các giao dịch, ví dụ <b>T</b>= ${T_{1},T_{2},T_{3}…}$. Dòng dữ liệu
+có chiều dài vô hạn. Tại thời điểm j, data window Ti,j là một chuỗi các giao dịch từ
+thời điểm i trước đó tới thời điểm hiện tại: $T_{i,j} = {T_{i},T_{i+1},T_{i+2},…,T_{j}}$. Vì các mẫu nhỏ
+hơn có thể là tập con của các mẫu lớn hơn, bất kì data window có thể chứa lượng lớn
+các mẫu. Cho Patt(T) là một hàm liệt kê tất cả mẫu con mà nằm trong T. Độ hổ trợ s
+của mẫu con P trong dòng dữ liệu T được tính bởi:$$s(P)=\frac{count(P,Patt(T))}{|T|}$$</p>
+<p>Nơi count(P,Patt(T)) là số lần mẫu P xuất hiện trong tập các mẫu con Patt(T). Sau
+đó, cho một hổ trợ tối thiểu $\sigma, 0 < \sigma < 1,$ mẫu P là mẫu phổ biến của T nếu và chỉ
+nếu 𝑠𝑃 ≥ 𝜎 Vấn đề khai thác mẫu phổ biến trong data stream là tìm kiếm tập tất
+cả các mẫu phổ biến P$\in$<b>P</b> được chứa trong data window Ti,j. một biến thể khác là
+khai thác top-k mẫu phổi biến, tìm k mẫu có độ phổ biến cao nhất bỏ qua độ hổ trợ
+tối thiểu.</p>
+<table border="1" align="center">
+<tr>
+<th>Itemset ID</th>
+<th>Contents</th>
+</tr>
+<tr>
+<td>&#8195;1<br>&#8195;2<br>&#8195;3<br>&#8195;4<br>&#8195;5
+</td>
+<td>&#8195;ABDE<br>&#8195;B,C<br>&#8195;A,B,C,D,E<br>&#8195;B,C,D,E<br>&#8195;A,C,E
+</td>
+</tr>
+</table>
+<h4 align="center">Bàng 4-1: Ví dụ của itemset stream [15]</h4>
+<p>Hãy xem cách mô hình này phù hợp như thế nào đối với bài toán khai thác itemset
+phổ biến. Trong ví dụ ở bảng 9.1, mỗi đối tượng dữ liệu trong stream là một itemset.
+Các mẫu đang tìm là các itemsets phổ biến đang nằm bên trong mỗi đối tượng dữ
+liệu. Ví dụ, T<sub>1</sub> = {A,B,D,E} và Patt(T<sub>1</sub>) = {(A,B),(A,D),(A,E),(B,D),
+(B,E),(D,E),(A,B,D),(A,B,E),(A,D,E),(B,D,E),(A,BD,E)}, bỏ qua các mẫu chỉ có một
+item. Nếu độ hổ trợ tối thiểu $\sigma$ = 0.6, itemset phải xảy ra ít nhất 3 lần trong 5 đối
+tượng trong stream. Các itemset phổ biến là $Patt_{\sigma=0.6}(T_{1,5})$ = (A,E),(B,C),(B,D),(B,E),(D,E), và (B,D,E).</p>
+<table border="1" align="center">
+<tr>
+<th>Data object</th>
+<th>Contents</th>
+</tr>
+<tr>
+<td>&#8195;Item or Itemset<br>&#8195;Itemset<br>&#8195;Sequence<br>&#8195;Iemset<br>&#8195;Tree<br>&#8195;Graph
+</td>
+<td>&#8195;Item<br>&#8195;Subitemset<br>&#8195;Subsequence<br>&#8195;Sequence of items spanning a sequence of itemsets<br>&#8195;Subtree<br>&#8195;Subgraph or subtree
+</td>
+</tr>
+</table>
+<h4 align="center">Bàng 4-2: Một số mẫu khác được khai thác từ stream [15]</h4>
+<p>Bảng 4-2, liệt kê danh sách các loại đối tượng dữ liệu và mẫu tương ứng có
+thể được khai thác trên stream.</p>
+<p>Trong cùng một loại dữ liệu tùy cách ta xác định đối tượng dữ liệu mà mẫu
+được khai thác cũng khác nhau. Ví dụ, một tài liệu văn bản có thể được xem tập hợp
+các từ vựng, cho khai thác item phổ biến, hay một chuỗi các từ, cho khai thác cuỗi
+phổ biến.</p>
+<p>Có rất nhiều mẫu phổ biến để khai thác trên data stream. Nhưng hai mẫu item
+và itemset là hai mẫu phổ biến cơ bản và cũng nhận được sự quan tâm của những nhà
+nguyên cứu nhất. Trong khóa luận, chúng tôi chỉ tập trung khai thác hai mẫu phổ biến
+này trên data stream. Để hiểu rõ hơn về khai thác item và itemset phổ biến, chúng tôi
+sẽ trình bày cụ thể hơn 2 bài toán này ở 2 chương sau.</p>
+<h2><a name="4.4">4.4. Khai thác items phổ biến trên data stream</a></h2>
+<p>Ngày nay, bài toán khai thác items phổ biến trên data stream vẩn nhận được nhiều
+sự chú ý từ các nhà nguyên cứu. Ứng dụng của khai thác items phổ biến là rất lớn.
+Nếu items là món hàng trong hơn hàng thì bài toán khai thác items phổ chính là bài
+toán tìm món hàng thường xuyên được mua. Nếu items là một từ khóa trong dòng
+trạng thái trong mạng xã hội thì bài toán khai thác items phổ biến chính là bài toán
+tìm từ khóa được mọi người quan tâm nhất. Chính vì vậy, nhiều nhà nguyên cứu đã
+đề xuất ra nhiều thuật toán để khai thác một cách hiệu quả items phổ biến trên data
+stream.</p>
+<p>Có nhiều cách tiếp cận cho việc tìm item phổ biến trên data stream. Nhìn chung
+có thể phân thành ba cách tiếp cận sau: Counter, Sketch và Sampling [16].</p>
+<h3 class="subheader1">4.4.1. Hướng tiếp cận Counter</h3>
+<p>Một dạng rất cơ bản của hướng tiếp cận Counter-based là Majority trong việc tìm
+item có độ phổ biến cao nhất trên stream nếu nó tồn tại [17, 18]. Bằng việc tổng quát
+hóa Majority, Mirsa và Gries [19] đã đề xuất 1 phương thức để tìm những items mà
+xảy ra ít nhất N/k lần và nó được cải thiện trong tốc độ xử lý mỗi item bởi [20, 21].
+Lossy counting [22] làm cùng 1 công việc nhưng nó đảm bảo thêm rằng không có
+57
+item nào mà số đếm (count) của nó thấp hơn N(1/k - $\epsilon$) được báo cáo. SpaceSaving
+[23] giảm yêu cầu về vùng nhớ không chỉ cho data chung chung mà còn cho phân
+phối Zipf.</p>
+<h3 class="subheader1">4.4.2. Hướng tiếp cận Sketch</h3>
+<p>Tiếp cận này luôn luôn dựa trên nhiều hàm băm (hash function) để ánh xạ (map)
+item mới tới vào trong bảng băm (hash table). Điều này có thể được hiểu như là duy
+trì một danh sách các số đếm không phụ thuộc (independent counter) nơi mỗi số đếm
+được chia sẽ bởi 1 số ít items và cách chia sẽ được xác định thông qua hàm băm.
+Charikar và các đồng nghiệp đã đề xuất CountSketch mà tính các items xuất hiện ít
+nhất N/(k+1) lần với xác xuất 1- $\delta$ trong khi yêu cầu O(k/$\epsilon$ - logN/$\delta$) không gian bộ
+nhớ. Yêu cầu bộ nhớ được cải thiện bởi CountMin [24]. GroupTest [25] được phát
+triển cho truy vấn hot items. Jin và các đồng nghiệp của ông cải tiến GroupTest trong
+không gian và thuật toán của họ đảm bảo số đếm tối thiểu (minimum count) của chúng
+được xuất [26].</p>
+<h3 class="subheader1">4.4.3. Hướng tiếp cận Sampling</h3>
+<p>Tiếp cận này gắn liền với quá trình lấy mẫu, và tất cả items đang xét được lấy
+mẫu từ stream; vậy chỉ 1 phần của stream được xét. Vitter [27] đề xuất 1 phương
+thức lấy mẫu độc lập từ 1 data stream bởi items có độ phổ biến cao hơn được lấy
+nhiều hơn so với items có độ phổ biến thấp. Cải thiện yêu cầu không gian cho lấy
+mẫu, Gibbons và Matias [17] đã đề xuất 1 phương thức được gọi là concise sampling
+mà thể hiện một cách hiệu quả items được lấy mẫu. Bằng thay đổi nhẹ phương thức,
+họ còn đề xuất counting sampling [22] để ước lượng độ phổ biến item chính xác hơn.</p>
+<h2><a name="4.5">4.5. Khai thác itemsets phổ biến trên data stream</a></h2>
+<p>Ý tưởng khai thác itemsets phổ biến lần đầu tiên được đề xuất cho dữ liệu giao
+dịch bởi R.Agrawal và R.Srikant với thuật toán Apriori [9] cho dữ liệu tĩnh, từ itemset
+phổ biến tìm được các tác giả cũng đề hướng khai thác luật kết hợp từ itemsets này.
+Từ lúc này, khai thác itemsets thu hút được nhiều sự chú ý từ các nhà nguyên cứu và
+nhiều công trình nguyên cứu ra đời.</p>
+<p>Bài toán khai thác itemset có thể được định nghĩa như sau: Cho một bộ dữ liệu
+gồm có N giao dịch $T = {T_{1},T_{2},…,T_{N}}$ và độ hổ trợ tới thiểu là 𝜎 Mỗi giao dịch T<sub>i</sub>
+chứa $n_{T_{i}}$ items. Vậy số tập itemset có thể có từ Ti là $2^{T_{i}}$− 1.Nhiệm vụ của bài toán
+là khai thác itemset phổ biến là tìm tất cả các itemset được lấy mỗi transaction T mà
+số lần xuất hiện của nó lớn hơn $\sigma$N.</p>
+<p>Vì giới hạn chỉ được duyệt 1 lần dữ liệu khi xử lý trên stream, hầu hết tất cả thuật
+toán khai thác itemset phổ biến chỉ tìm được một kết quả xấp xỉ phổ biến. Những
+thuật toán rơi vào trong hai loại [15]: Thuật toán false positive đảm bảo kết quả bao
+gồm tất cả những itemset thật sự phổ biến, nhưng còn thêm số itemset khác không
+phổ biến. Thuật toán false negative đảm bảo kết quả trả về chắc chắn là itemset thật
+phổ biến, nhưng có thể còn những itemset phổ biến nhưng chưa được tìm thấy.</p>
+<h2><a name="4.6">4.6. Thuật toán nền cho bài toán khai thác itemset phổ biến</a></h2>
+<p>Trong chương 7, chúng tôi sẽ trình thuật toán khai thác itemset phổ biến Skip
+LC-SS. Thuật toán này được xây dựng dựa trên hai thuật toán cơ sơ là Lossy Counting
+[22] và Space Saving [23]. Cả hai thuật toán đều rất nổi tiếng và là thuật toán cơ sở
+cho nhiều thuật toán khai thác item và itemset phổ biến khác.</p>
+<h3 class="subheader1">4.6.1 Thuật toán Lossy Counting</h3>
+<p>Vào năm 2002, G.S. Manku và R.Motwani đã đề xuất ra thuật toán nổi tiếng
+Lossy Counting. LC là thuật toán xấp xỉ tìm được cả frequent items hay frequent
+itemset trên data stream chỉ với 1 lần duyệt. Cho trước minimal support $sigma$, error
+parameter ϵ (0 < $\epsilon < \sigma$), và 1 data stream với N transactions, thuật toán LC trả về 1
+tập các itemset mà có support $\geq$ ($\sigma-\epsilon$)N. Như vậy, thuật toán LC là no false negative
+vì có thể trả về những itemset có support < $\sigma$N.</p>
+<table border="1" align="center">
+<tr>
+<th>Thuật toán 1: LossyCounting</th>
+</tr>
+<tr>
+<td>&#8195;<b>Input</b>: Chiều dài k của mỗi bucket<br>&#8195;1&#8195;&#8195;$n \gets 0, \Delta \gets 0, T \gets \theta$;
+<br>&#8195;2&#8195;&#8195;foreach i do<br>&#8195;3&#8195;&#8195;&#8195;&#8195;n $\gets$ n+ 1;<br>&#8195;4&#8195;&#8195;&#8195;&#8195;if i $\in$ T then $c_{i} \gets c_{i} +1$;
+<br>&#8195;5&#8195;&#8195;&#8195;&#8195;else;<br>&#8195;6&#8195;&#8195;&#8195;&#8195;&#8195;&#8195;T $\gets T \cup {i}$;<br>&#8195;7&#8195;&#8195;&#8195;&#8195;&#8195;&#8195;$c_{i} \gets \Delta +1$;
+<br>&#8195;8&#8195;&#8195;&#8195;&#8195;endif<br>&#8195;9&#8195;&#8195;endfor<br>&#8195;10&#8195;&#8195;if [N/k] $\neq \Delta$<br>&#8195;11&#8195;&#8195;&#8195;&#8195;$\Delta \gets$ [N/k];
+<br>&#8195;12&#8195;&#8195;&#8195;&#8195;foreach i $\in$ T do<br>&#8195;13&#8195;&#8195;&#8195;&#8195;&#8195;&#8195;if $c_{j} < \Delta$ then T $\gets T_{i}$;
+<br>&#8195;14&#8195;&#8195;&#8195;&#8195;endfor<br>&#8195;14&#8195;&#8195;endif
+</td>
+</tr>
+</table>
+<h4 align="center">Thuật toán 1: thuật toán LossyCounting [22]</h4>
+<p>Trong thuật toán này, một entry cho itemset α được thể hiện dưới dạng tuple {α,
+f(α), $\Delta$(t) }, nơi f(α) là số lần xuất hiện của a sau thời điểm t và ∆(t) là error count tại
+thời điểm t, với t là thời điểm gần nhất mà α được lưu.</p>
+<p>Thuật toán chia N transactions thành các buckets có cùng kích thước k (k = 1/ $\epsilon$).
+Có [N/k] hay [N $\epsilon$] buckets. Khi transaction thứ n tới (0 $\leq$ n $\leq$ N), transaction này
+thuộc bucket [n/k]. Khi bucket thứ i đã đầy, thì bucket thứ i + 1 sẽ tiếp tục nhận
+transaction. ∆ cho biết vị trí bucket hiện tại đang nhận transaction. Từ dòng 4 tới dòng
+thứ 8, mỗi lần 1 itemset α tới, ta cập nhật lại f(α) nếu α đã được lưu hay lưu mới α có
+tuple { α,1, ∆ } nếu α chưa được lưu. Từ dòng thứ 9 tới 12, khi transaction n thuộc
+bucket thứ ∆ + 1 tới, ta cập nhật lại ∆ ← [n ϵ] và bỏ đi những itemset j có f(j) + ∆<sub>j</sub> <
+∆.</p>
+<p>Có thể hiểu thuật toán này cách đơn giản như sau. Việc chia bucket thực chất là
+việc cắm các cột mốc để dần loại bỏ đi những phần tử itemset ít xuất hiện trong data
+stream. Cột mốc của bucket là giai đoạn chuyển giữa hai bucket liên tiếp. Một itemset
+muốn được lưu trữ thì chúng phải xuất hiện ít nhất một lần tại mỗi bucket</p>
+<p>Ý nghĩa của khái niệm error count ∆. Ở một số tài liệu sau này, người ta coi f(α)
++ ∆α = c(α) tên là frequent count. Để ý sẽ thấy, thuật toán LC vẩn chạy tốt chỉ cần
+frequent count. Tác giả tách frequent count thành 2 thành là frequent f(α) và error
+60
+count là ∆α. Frequent f(α) là số lần xuất hiện của α từ lúc α bắt đầu được lưu trữ.
+Frequent f(α) không phản ánh được support của α vì có thể α đã được xuất hiện trước
+đó và đã bị xóa đi vì ít xuất hiện. Error count ∆α là chặn trên của số lần α xuất hiện
+nhưng không được đếm. Ta có: f(α) + ∆α = c(α) >= supp(α)</p>
+<p>Trong thuật toán này, một entry cho itemset α được thể hiện dưới dạng tuple {α,
+f(α), ∆(t) }, nơi f(α) là số lần xuất hiện của a sau thời điểm t và ∆(t) là error count tại
+thời điểm t, với t là thời điểm gần nhất mà α được lưu.</p>
+<p>Thuật toán chia N transactions thành các buckets có cùng kích thước k (k = 1/ ϵ).
+Có [N/k] hay [N ϵ] buckets. Khi transaction thứ n tới (0 <= n <= N), transaction này
+thuộc bucket [n/k]. Khi bucket thứ i đã đầy, thì bucket thứ i + 1 sẽ tiếp tục nhận
+transaction. ∆ cho biết vị trí bucket hiện tại đang nhận transaction. Từ dòng 4 tới dòng
+thứ 8, mỗi lần 1 itemset α tới, ta cập nhật lại f(α) nếu α đã được lưu hay lưu mới α có
+tuple { α,1, ∆ } nếu α chưa được lưu. Từ dòng thứ 9 tới 12, khi transaction n thuộc
+bucket thứ ∆ + 1 tới, ta cập nhật lại ∆ ← [n ϵ] và bỏ đi những itemset j có f(j) + ∆j <
+∆.</p>
+<p>Có thể hiểu thuật toán này cách đơn giản như sau. Việc chia bucket thực chất là
+việc cắm các cột mốc để dần loại bỏ đi những phần tử itemset ít xuất hiện trong data
+stream. Cột mốc của bucket là giai đoạn chuyển giữa hai bucket liên tiếp. Một itemset
+muốn được lưu trữ thì chúng phải xuất hiện ít nhất một lần tại mỗi bucket.</p>
+<p><b>Ý nghĩa của khái niệm error count ∆</b>. Ở một số tài liệu sau này, người ta coi f(α)
++ ∆α = c(α) tên là frequent count. Để ý sẽ thấy, thuật toán LC vẩn chạy tốt chỉ cần
+frequent count. Tác giả tách frequent count thành 2 thành là frequent f(α) và error
+60
+count là ∆α. Frequent f(α) là số lần xuất hiện của α từ lúc α bắt đầu được lưu trữ.
+Frequent f(α) không phản ánh được support của α vì có thể α đã được xuất hiện trước
+đó và đã bị xóa đi vì ít xuất hiện. Error count ∆α là chặn trên của số lần α xuất hiện
+nhưng không được đếm. Ta có: f(α) + ∆α = c(α) >= supp(α).</p>
+<p><b>Khuyết điểm của LC:</b></p>
+<ul>
+<li>
+Không giải quyết được vấn đề bùng nổ tổ hợp itemset. Khi 1 transaction tới,
+LC sẽ tổ hợp transaction thành 1 tập các itemset và tiến hành lưu trữ. Nếu
+bursty stream xảy ra, LC không quản lý vấn đề này.
+</li>
+<li>
+Thao tác xóa tại các mốc bucket tốn thời gian xử lý. Tại các mốc bucket, Lossy
+counting phải tiến hành duyệt lại và xóa đi những itemset không còn phổ biến
+nữa. Phép toán xóa tốn nhiều thời gian xử lý.
+</li>
+</ul>
+<h3 class="subheader1">4.6.2 Thuật toán Space Saving</h3>
+<p>Vào năm 2005, A. Metawally, D. Agrawal và A. E. Abbadi đã đề xuất ra thuật
+toán nổi tiếng khác Space Saving (SS). SS chỉ khai thác frequent items trên data
+stream không như thuật toán LC.</p>
+<table border="1" align="center">
+<tr>
+<th>Thuật toán 2: SpaceSaving</th>
+</tr>
+<tr>
+<td>&#8195;<b>Input</b>: Kích thước tối đa table k<br>&#8195;1&#8195;&#8195;$n \gets 0, T \gets \theta$;
+<br>&#8195;2&#8195;&#8195;foreach i do<br>&#8195;3&#8195;&#8195;&#8195;&#8195;$n \gets n + 1$;<br>&#8195;4&#8195;&#8195;&#8195;&#8195;if i $\in$ T then $c_{i} \gets c_{i} + 1$;
+<br>&#8195;5&#8195;&#8195;&#8195;&#8195; |T| < k then<br>&#8195;6&#8195;&#8195;&#8195;&#8195;&#8195;&#8195;T $\gets$ T $\cup$ {i};<br>&#8195;7&#8195;&#8195;&#8195;&#8195;&#8195;&#8195;$c_{i} \gets 1$;
+<br>&#8195;8&#8195;&#8195;&#8195;&#8195;else<br>&#8195;9&#8195;&#8195;&#8195;&#8195;&#8195;&#8195;j $\gets$ $argmin_{j \in T}c_{j}$;<br>&#8195;10&#8195;&#8195;&#8195;&#8195;&#8195;&#8195;$c_{j} \gets c_{j} +1$;
+<br>&#8195;11&#8195;&#8195;&#8195;&#8195;&#8195;&#8195;$T \gets T\cup${i}\{j};<br>&#8195;12&#8195;&#8195;&#8195;&#8195;endif<br>&#8195;13&#8195;&#8195;endfor
+</td>
+</tr>
+</table>
+<h4 align="center">Thuật toán 2: thuật toán SpaceSaving [23]</h4>
+<p>SS sử dụng dụng 1 table D có kích thước k cố định để lưu trữ entry. Nếu item tới
+và item đó đã nằm trong table, dòng 4, cập nhập frequent count. Nếu item tới và là
+mới thì sẽ có trường hợp. Nếu table D có kích thước |D| < k, dòng 5 tới 7, item được
+thêm vào table. Nếu table đã đầy|D| = k, dòng 9 tới 11, SS sẽ thay item có frequent
+count thấp nhất trong table D bằng item mới</p>
+<p>Liệu phép toán thay thế item có frequent count thấp nhất trong table D có thể sẽ
+làm những item, mà nó mới được thay, bị thay ngay sau đó vì item mới được thêm
+đó có frequent count rất thấp sẽ là đối tượng cho phép toán thay thế, dòng 11. Vấn đề
+được giải quyết ở dòng 10, c<sub>i</sub> ← c<sub>min</sub> + 1, rõ ràng item mới được thay thế vẩn là mục
+tiêu của phép toán thay thế. Điều này dẩn tới item mới này đè lên item mới khác, dẩn
+tới tăng c<sub>min</sub>. Tới một lúc nào đó cmin tăng vượt qua item cũ nằm trong table D, item
+cũ đó sẽ bị thay thế. Việc tăng c<sub>min</sub> tạo cơ hội cho những item mới vượt qua những
+item cũ có frequent count cao nhưng đã khá lâu chưa được tăng.</p>
+<p>Cho ϵ là error parameter, tương tự như LC. Nếu k$\geq$1/ ϵ thì thuật toán SS sẽ
+output ra mỗi item e mà suppI $\geq$ ϵN. Do đó cho mininal support σ (0 < ϵ < σ), item
+mà có suppI $\geq$ σN cũng sẽ là output của thuật toán SS (no false negative). Do đó cần
+ít nhất O(1/ ϵ) không gian bộ nhớ.</p>
+<p>So sánh với LC. SS sử dụng phép toán thay thế thay vì phép toán xóa như LC,
+phép toán SS nhanh hơn. SS không tách frequent count thành frequent cộng với error
+count như LC.</p>
+<h2><a name="4.7">4.7. Kết luận</a></h2>
+<p>Trong chương này, chúng ta đã trình bày cái khác niệm về mẫu phổ biến, vấn đề
+khai thác mẫu phổ biến trên data stream và ý nghĩa. Chúng ta cũng định nghĩa một
+cách hình thức về bài toán khai thác mẫu phổ biến dùng chung cho tất cả các mẫu
+như là: item, itemset, chuỗi, cây, đồ thị. Để chuẩn bị cho mục tiêu của khóa luận là
+62
+khai thác hai mẫu phổ biến là item và itemset, hai bài toán khai thác này được trình
+bày chi tiết hơn.</p>
+</body>
+</html>

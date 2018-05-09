@@ -1,0 +1,434 @@
+<html>
+<head>
+<meta charset="UTF-8">
+<link rel="stylesheet" type="text/css" href=".\thesis.css">
+<script type="text/x-mathjax-config">
+  MathJax.Hub.Config({tex2jax: {inlineMath: [['$','$'], ['\\(','\\)']]}});
+</script>
+<script type="text/javascript"
+  src="http://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML">
+</script>
+</head>
+<body>
+<h1>CHƯƠNG 2: TỔNG QUAN VỀ HỆ THỐNG PHÂN TÍCH DATA STREAM</h1>
+<p class="abstract">Trong chương này, chúng tôi sẽ trình bày về một số khái niệm cơ bản về
+loại dữ liệu Data Stream như nguồn dữ liệu, những đặc trưng của dữ liệu này
+so với những loại dữ liệu khác, ý nghĩa và thách thức trong việc khai thác loại
+dữ liệu này. Chương này còn trình bày về kiến trúc tổng quan cẩn có của một
+hệ thống phân tích Data Stream, những đặc trưng của hệ thống này so với
+những hệ thống khác, và trình bày về 5 thành phần thiết yếu của một hệ thống
+phân tích Data Stream. Cuối cùng đưa ra một số lời khuyên về việc chọn
+frameworks thích hợp để tích hợp vào kiến trúc hệ thống phân tích Data Stream
+tổng quan.</p>
+<h3>Các mục chính trong chương:</h3>
+<p><a href="#2.1">2.1. Data Stream</a></p>
+<p><a href="#2.2">2.2. Kiến trúc tổng quan hệ thống phân tích Data Stream</a></p>
+<p><a href="#2.3">2.3. Lựa chọn từng phần cho hệ thống phân tích Data Stream</a></p>
+<p><a href="#2.4">2.4. Tổng kết</a></p>
+<h2><a name="2.1">2.1. Data Stream</a></h2>
+<p>Ngày nay, có rất nhiều loại dữ liệu khác nhau đến từ nhiều nguồn như là dữ liệu
+giao tác, dữ liệu network, dữ liệu web, dữ liệu siêu văn bản, …. Nhưng trong số đó
+phải kể tới dữ liệu Data Stream, với đặc tính nổi bật về tốc độ truyền tải và lượng
+thông tin hữu ích tìm ẩn bên trong dữ liệu. Data Stream là một nguồn dữ liệu mới,
+là nơi mà dữ liệu được tạo ra liên tục với cường độ cao [1].</p>
+<p>Một số ví dụ về data stream là dòng các gói tin được gửi trên mạng, click stream,
+thông tin được gửi về từ các cảm biến, text stream, chuỗi các giao tác. Tiếp theo sau,
+chúng tôi sẽ trình bày về một số nguồn Data Stream, đặc trưng của Data Stream so
+với những loại dữ liệu khác, và một số vấn đề gặp phải trong việc phân tích nó.</p>
+<h3 class="subheader1">2.1.1. Một số nguồn dữ liệu trong Data Stream</h3>
+<p>Nguồn Data Stream là nguồn sinh ra Data Stream, thường sinh ra dữ liệu liên tục
+và không bao giờ kết thúc. Nguồn Data Stream rất phong phú và đa dạng, nhưng ta
+có thể chia chúng thành 5 loại nguồn chính [1].</p>
+<p>&#9733 <b> Web analytics</b></p>
+<p>là nguổn dữ liệu real-time đến từ websites của những tổ chức hoặc
+công ty thông qua thương mại điện tử và quảng cáo trực tuyến. Ví dụ như việc thu
+thập dữ liệu lịch sử và hiện tại từ những người dùng cuối, để gợi ý những sản phẩm
+tốt hơn như là Amazon. Hoặc là việc khai thác lịch sử lược view để giới thiệu phim
+cho người dùng như là Netflix</p>
+<p>&#9733 <b> Operational Monitoring</b><p>
+<p>Operational Monitoring là hành động theo giỏi và giám xát các thiết bị từ phần
+cứng thông qua phần mềm. Thông thường, loại dữ liệu này được lấy từ việc theo dõi
+hiệu năng của những hệ thống vật lý. Ví dụ như nguồn dữ liệu đến từ việc thu thập
+dữ liệu nhiệt độ từ các sensors cảm biến như là tốc độ quạt, cường độ dòng điện trong
+hệ thống,….</p>
+<p>&#9733 <b> Online Advertising</b>
+<p>Online Advertising là những dữ liệu được thập từ những nguồn quảng cáo khác
+nhau. Những dữ liệu này thường được thu thập từ những giao dịch trên thị trường
+chứng khoán, hay số lần click vào những banner quảng cáo. Ví dụ: click stream, …</p>
+<p>&#9733 <b> Social Media</b></p>
+<p>Social Media là nguồn dữ liệu đền từ những mạng xã hội, và truyền thông. Nguồn
+dữ liệu này rất đa dạng và phong phú về loại dữ liệu như dòng dữ liệu video , dữ liệu
+ảnh, dữ liệu text, status trên mạng xẽ hội, các bản tin,....</p>
+<p>&#9733 <b> Mobile Data and Internet of Things</b>
+<p>Đây là một nguồn dữ liệu mới và đầy tìm năng, bởi vì lượng dữ liệu đổ về ngày
+càng nhiều với tốc độ tăng nhanh đáng kinh ngạc, và những dữ liệu đó có liên quan
+chặt chẽ tới con người hơn khi so với những dữ liệu đến từ những nguồn khác. Những
+dữ liệu này đến từ những điện thoại thông minh, máy tính bảng, đồng hồ thông minh,
+hay từ những sensors cảm biến. Vì thế, việc khai thác dòng dữ liệu từ nguồn này đặt
+ra nhiều thách thức và tìm năng trong tương lại.</p>
+<h3 class="subheader1">2.1.2. Đặc trưng của Data Stream</h3>
+<p>Mặc dù Data Stream có rất nhiều đặc điểm nổi bật như là nguồn dữ liệu lớn, ngày
+càng phát triển, cấu trúc dữ liệu linh động, tốc độ truyền tải rất nhanh, đến từ rất nhiều
+nguồn khác nhau,.... Tuy nhiên, có 3 tính chất đặc trưng [1] nhất mà làm cho Data
+Stream khác biệt so với những loại dữ liệu khác.</p>
+
+<p>&#9733 <b> Always On, Always Flowing</b><p>
+<p>Data Stream thì luôn luôn sẵn sàng đến từ bất kỳ đâu và bất cứ lúc nào, những dữ
+liệu thì luôn mới và được tạo ra liên tục không bao giờ kết thúc. Trong một vài trường
+hợp lượng dữ liệu này đồ về rất nhiều, điều đó đặt ra nhiều thách thức cho những hệ
+thống quản lý và khai thác nó.</p>
+<p>&#9733 <b> Loosely Structured</b>
+Data stream thường có cấu trúc dữ liệu linh hoạt hơn so với những bộ dữ liệu
+khác. Bởi vì, nó đến từ nhiều nguồn dữ liệu khác nhau, được thu thập từ nhiều nơi và
+được cấu thành từ nhiều thành phần dữ liệu khác nhau. Cho nên sự đa dạng về cấu
+trúc dữ liệu của data stream cao hơn những loại dữ liệu khác.</li>
+<p>&#9733 <b> High-Cardinality Storage</b></p>
+<p>Cardinality chỉ tới số lượng giá trị duy nhất mà một đơn vị dữ liệu có thể mang
+đi. Nói cách khác, Cardinality chỉ kích thước của một bộ dữ liệu có thể được tạo ra.
+Vấn đề nhiều thành phẩn dữ liệu được lưu trữ trong một đối tượng dữ liệu là một
+trong những đặc trưng nổi bật của data stream.</p>
+<p>Mặc dù, đặc điểm này thì phổ biến cả trong Batch System và Streaming System,
+nhưng nó khó giải quyết high-cardinality hơn trong hệ thống khai thác Data Stream.
+Bởi vì, trong Batch System thì dữ liệu được chia thành nhiều phần nhỏ và được xử lý
+song song, số lần duyệt dữ liệu có thể nhiều hơn 1 lần, và thời gian xử lý thoáng hơn
+nhiều. Điều này đặt ra những thách thức lớn đối với những hệ thống phân tích Data
+Stream so với những hệ thống phân tích dữ liệu Batch.</p>
+<h3 class="subheader1">2.1.3. Khó khăn và thách thức trong việc phân tích Data Stream</h3>
+<p>Từ những đặc điểm của Data Stream và một số nghiên cứu về hệ thống quản lý
+dữ liệu dòng, một số vấn đề [3] gặp phải khi triển khai xây dựng một hệ thống phân
+tích dữ liệu Data Stream.</p>
+<ul>
+<li>Việc xử lý truy vấn trên data stream yêu cầu một lượng bộ nhớ rất lớn và
+không thể dự đoán được. Vì thế cần những công nghệ xử lý truy vấn gần đúng
+để giải quyết việc này.</li>
+<li>Tốc độ dữ liệu truyền vào nhanh hơn tốc độ xử lý của hệ thống trong một vài
+trường hợp. Vì thế ta cần phải thực hiện một số phương pháp lấy mẫu dữ liệu
+khi cần.</li>
+<li>Việc phân tích trực tiếp trên stream đòi hỏi những thuật toán nhanh và nhẹ để
+có thể đáp ứng việc hồi đáp tức thời của hệ thống</li>
+<li>Việc phân tích trực tiếp trên stream đòi hỏi những thuật toán nhanh và nhẹ để
+có thể đáp ứng việc hồi đáp tức thời của hệ thống</li>
+<li>Đòi hỏi một hệ thống đủ mạnh và có khả năng chịu lỗi cao, hổ trợ những cơ
+chế thực hiện tính toán lại dữ liệu bị thất thoát và khắc phục sự cố hệ thống</li>
+<li>Hệ thống phân tích stream thường chỉ được duyệt dữ liệu một lần duy nhất và
+đưa ra một kệt quả gần đúng sau lần duyệt đó</li>
+</ul>
+<h2><a name="2.2">2.2. Kiến trúc tổng quan hệ thống phân tích Data Stream</h2>
+<p>Ngày nay đã có nhiều frameworks mới hổ trợ việc xây dựng một hệ thống phân
+tích Data Stream, mỗi framework chỉ giả quyết một hay một vài chức năng trong hệ
+thống này; chúng cần được liệt kết với nhau để tạo thành một hệ thống lớn. Chính vì
+vậy, chúng ta cần thiết kế một mô hình kiến trúc để liên kết các frameworks này lại
+thành một khối mạnh mẽ trong xử lý và linh động trong thiết kế và triển khai. Có rất
+nhiều lý do khác nhau cho việc xây dựng lên một kiến trúc hổ trợ phân tích Data
+Stream, từ việc duy trì tình trạng ổn định của hệ thống trong môi trường triển khai
+cho tới việc phục vụ các yêu cầu dịch vụ, bên cạnh đó một kiến trúc hệ thống tốt còn
+giúp giảm chỉ phí vận hành và phát triển, giúp ta dễ dàng hơn trong việc tích hợp nó
+vào một hệ thống lớn hơn sau này.</p>
+<p>Phần còn lại của chương này, chúng tôi sẽ trình bày một mô hình kiến trúc tổng
+quát, nó đóng vai trò như là một kiến trúc nền tảng cho việc phát triển một hệ thống
+khai thác Data Stream trong môi trường phân tán. Bên cạnh đó, chương này còn trình
+bày 3 đặc điểm quan trọng cần có của một hệ thống khai thác Data Stream. Tương
+ứng với từng thành phần trong mô hình kiến trúc tổng quan, chương cũng đề ra một
+số frameworks thích hợp cho từng thành phần. Trong mục cuối của chương, chúng
+tôi sẽ trình bày một số thảo luận về việc chọn những frameworks thích hợp giúp việc
+triển khai một hệ thống phân tích Data Stream mà chúng tôi sử dụng để triển khai hệ
+thống.</p>
+<h3 class="subheader1">2.2.1. Mô hình kiến trúc tổng quan</h3>
+<p>Như đã được giới thiệu bên trên về ý nghĩa và tầm quan trọng của một mô hình
+kiến trúc tổng quan khai thác Data Stream. Trong mục này, chúng tôi sẽ trình bày mô
+hình trừu tượng của một hệ thống khai thác dòng dữ liệu [1].</p>
+<p>Kiến trúc này được vẽ lại một cách trực quan như hình 2-1 bên dưới. Mô hình
+gồm có 5 thành phần cấu thành nên, mỗi thành phần đảm nhận một nhiệm vụ khác
+nhau trong toàn bộ hệ thống. Thông thường dữ liệu sẽ được truyền tuần tự qua các
+thành phần này với những mục đích khác nhau, nhưng trong một số trường hợp Data
+Stream có thể được phân nhánh và chỉ chuyền qua một vài thành phần trong mô hình,
+điều này phụ thuộc vào nhu cầu người dùng. Không phải tất cả hệ thống phân tích
+Data Stream đều có tất cả 5 thành phần này, nhưng đây là những thành phần quan
+trọng và thiết yếu cần có của một Streaming System.</p>
+<img src=".\images\FIG02-01.jpg"/>
+<h4 align="center">Hình 2-1: Kiến trúc hệ thống phân tích dòng dữ liệu</h4>
+<table style="margin-left: 30px;">
+<tr>
+<th>Collection</th>
+<td>Thành phần làm nhiệm vụ thu thập dữ liệu và truyền vào Data Flow</td>
+</tr>
+<tr>
+<th>Data Flow</th>
+<td>Chịu trách nhiệm quản lý dòng dữ liệu truyền vào và phát ra</td>
+</tr>
+<tr>
+<th>Processing</th>
+<td>Làm nhiệm vụ xử lý và phân tích dữ liệu trực tuyến</td>
+</tr>
+<tr>
+<th>Storage</th>
+<td>Thành phần lưu trữ dữ liệu để phục vụ cho nhiều mục đích khác
+nhau</td>
+</tr>
+<tr>
+<th>Delivery</th>
+<td>Thực hiện việc phân tán và hiển thị dữ liệu sau khi phân tích</td>
+</tr>
+</table>
+<p>Trong giai đoạn đầu, dữ liệu được thu thập từ các thành phần khác nhau thông qua
+thành phần collection và được đổ trực tiếp vào data flow. Tại thành phần data flow
+dữ liệu được lưu trữ vào một queue trong bộ nhớ để phục vụ việc phun dữ liệu cho
+những thành phần khác trong hệ thống. Giai đoạn tiếp theo, dữ liệu được đổ vào thành
+phần processing để phục vụ cho quá trình khai thác dữ liệu trên Data Stream, sau đó
+kết quả của quá trình phân tích sẽ được lưu lại trong thành phần storage. Thành phần
+delivery sẽ thực hiện việc hiển thị và phân tán dữ liệu được lưu trữ trong storage đến
+những người dùng cuối. Nội dung chi tiết của từng thành phần sẽ được trình bày cụ
+thể trong những mục sau của chương này.</p>
+<h3 class="subheader1">2.2.2. Đặc trưng của hệ thống phân tích Data Stream</h3>
+<p>Tất cả các thành phần của hệ thống phân tích Data stream có trong mẫu kiến trúc
+bên trên đều dựa trên 3 đặc điểm chính [1] là: high availability, low latency, và
+horizontal scalability. Nếu thiếu một trong những tính chất này, hệ thống phân tích
+Data Stream sẽ gặp những nguy cơ tìm ẩn cao và hạn chế trong khâu triển khai hệ
+thống.</p>
+<p>&#9733 <b> High Availability</b></p>
+<p>High-availability là tính sẵn sàng cao của hệ thống. Nó là một trong những đặc
+điểm chính của ứng dụng xử lý Data Stream khi so sánh nó với những ứng dụng
+batch-processing hay business-intelligence (BI). Bởi vì, trong những ứng dụng Batch
+và BI thì việc xử lý chậm trể vài phút hoặc vài giờ cũng không ảnh hưởng quá nhiều
+tới hoạt động của hệ thống, nhưng trong hệ thống xử lý Data Stream thì việc xử lý dữ
+liệu phải thật nhanh và kết quả phải được trả ra ngay lập tức. Tính high-availability ở
+đây, không chỉ ám chỉ tới tính sẵn sàng của những dịch vụ, mà còn chỉ tới việc hệ
+thống luôn sẵn sàng cho việc xử lý dữ liệu.</p>
+<p>Tính high-availability thường không phải vấn đề lớn với thành phần Delivery
+trong kiến trúc bên trên, nhưng nó lại rất quan trọng với những thành phần khác như
+Collection, Data Flow, và Processing. Vì thế, để đảm bảo đặc tính này thì những hệ
+thống phân tích Data Stream thường dựa vào 2 tính chất nổi bật của hệ thống phân
+tán, đó là Distribution và Replication.</p>
+<ul>
+<li><b>Distribution</b> được định nghĩa là việc dùng nhiều máy server vật lý để phân
+tán việc xử lý cũng như thay thế cho những server bị lổi khi cần, nhằm đảm
+bảo đặc tính high-availability của hệ thống phân tích Data Stream</li>
+<li><b>Replication</b> là tính nhân rộng dữ liệu ra nhiều server vật lý khác nhau. Ngoài
+việc đảm bảo hệ thống luôn sẵn sàng hoạt động, thì nguồn dữ liệu đầu vào
+cũng phải luôn sẵn sàng để đảm bảo hệ thống luôn có dữ liệu mới để xử lý</li>
+</ul>
+<p>&#9733 <b> Low Latency</b></p>
+<p>Trong những ứng dụng Batch-Processing, Low-latency ám chỉ tới lượng thời gian
+mà server hồi đáp lại cho client sau khi nhận được request từ client. Tuy nhiên trong
+những ứng dụng phân tích Data Stream, Low-latency còn là lượng thời gian mà client
+chờ server xử lý và trả kết quả về lại, nó bao gồm 3 khoảng thời gian:</p>
+<ul>
+<li>Thời gian các nodes của servers trao đổi thông tin với nhau trong nội bộ</li>
+<li>Thời gian xử lý để đưa ra kết quả trả về</li>
+<li>Thời gian mà server hồi đáp lại người dùng cuối</li>
+</ul>
+<p>Vì vậy, để giảm nhiễu, ta phải cẩn nhắc tới việc giảm thời thời gian truyền tải và
+xử lý tại 3 thành phần Collection, Data Flow, và Processing.</p>
+<p>&#9733 <b> Horizontal Scalability</b></p>
+<p>Horizontal Scalability cho biết khả năng mở rộng của hệ thống. Đó là việc tích
+hợp thêm 1 số server khác vào hệ thống để giải quyết 1 số vấn đề cụ thề hoặc thêm
+thành phần xử lý vào hệ thống để tăng hiệu năng của toàn hệ thống. Vấn đề đặt ra là
+làm sao liên kết các server này lại với nhau thành 1 khối đồng nhất và mạnh mẻ.</p>
+<p>Quả thực vậy, khi các servers trong hệ thống cộng tác làm việc với nhau, lúc này
+xuất hiện nhiều vấn đề phức tạp. Vì thế đã có nhiều thuất toán ra đời để cho những
+server này có thể hợp tác làm việc một cách dễ dàng, và quản lý các server một cách
+hiệu quả trong trường hợp server bị sập hoặc mất liên kết với hệ thống. Hiện tại,
+những những thuật toán để quản lý stream được xây dựng và đóng gói như một dịch
+vụ thông qua những server quản lý liên kết, gọi là Coordination Servers. Một trong
+những hệ thống nổi tiếng làm việc này là hệ thống ZooKeeper</p>
+<h3 class="subheader1">2.2.3. Các thành phần cấu thành kiến trúc phân tích Data Stream</h3>
+<p>Như đã trình bày bên trên về kiến trúc tổng quan của một hệ thống phân tích Data
+Stream, trong mục này, chúng tôi sẽ mô tả chi tiết các thành phần cấu thành nên mẫu
+kiến trúc đó. Cùng với đó, chúng tôi sẽ giới thiệu một vài frameworks nổi tiếng và
+phù hợp cho việc tích hợp vào mô hình kiến trúc bên trên.</p>
+<p>&#9733 <b> Collection</b></p>
+<p>Thành phần Collection là nơi thu thập dữ liệu từ nhiều nguồn khác nhau. Trong
+những hệ thống lớn như Hadoop [2],thành phần này là nơi thu thập dữ liệu từ các
+người dùng cuối và thực hiện việc ghi Log-file vào bên trong những hệ thống lưu trữ
+phân tán. Tuy nhiên, trong hệ thống phân tích Data Stream được triển khai trong
+khóa luận, thành phần này được tích hợp vào bên trong Data Flow. Data Flow hiện
+nay làm việc như một cầu nối để truyền tãi dữ liệu giữa các ứng dụng khác nhau. Nó
+có khả năng hút dữ liệu được lưu trữ trong hệ thống HDFS của Hadoop và phun nó
+vào thành phần xử lý Processing của một ứng dụng cụ thể.</p>
+<p>Tuy nhiên, vấn đề đặt ra là cần một định dạng dữ liệu chung để có thể truyển tải
+dữ liệu Client-Server và trong nội bộ hệ thống. Ngày nay, với sự xuất hiện của định
+dạng JavaScrip Object Notation (JSON) đã gặt hái được những thành công và giải
+quyết được vấn đề trước kia gặp phải. JSON hổ trợ việc xây dựng một cấu trúc dữ
+liệu rõ ràng và linh động, bên cạnh đó nó cũng dễ dàng cho việc mở rộng, chỉnh sữa
+và có nhiều thư viện hổ trợ, vì thế nó dần trở thành 1 định dạng dữ liệu Log chuẩn và
+được xử dụng rộng rãi.</p>
+<p>&#9733 <b> Data Flow</b></p>
+<p>Data Flow hay còn gọi là Data Motion System là một phần quan trọng trong hệ
+thống phân tích Data Stream. Nó có 2 nhiệm vụ chính là truyền tải và thu thập dữ liệu
+trong môi trường phân tán. Hệ thống này có thể được sử dụng cho nhiều dịch vụ khác
+nhau, mà những dịch vụ này có thể phối hợp và cấu hình lẫn nhau, nó làm việc như
+một hệ thống phân tán và quản lý Data Stream đến từ nhiều nguồn. Về lịch sử hình
+thành và phát triển, hệ thống này được chia thành 3 giai đoạn.</p>
+<ul>
+<li>Trong thời kỳ đầu, hệ thống này được xem như là một hệ thống truy vấn dữ
+liệu, như là ActiveMQ. Tuy nhiên, nó không được thiết kế cho việc truyền tải
+dữ liệu lớn với tốc độ cao vì nó là một hệ thống Log-file phân tán. Ưu điểm
+của hệ thống này là sự tin cậy (reliability), vì nó đảm bảo giảm tới mức tối
+thiểu việc mất mác thông tin bằng việc ghi Log toàn bộ dữ liệu vào đĩa cứng.
+Mặc dù sau này khi ổ SSD ra đời, tốc độ đọc ghi có tăng đáng kể nhưng so với
+việc tốc độ của Ram thì vẩn còn thua xa.</li>
+<li>Thế hệ thứ 2 của hệ thống Data Flow nhân ra rằng việc truyền tải dữ liệu liệu
+cậy không phải là ưu tiên hàng đầu. Vì thế những nhà phát triển đã cài đặt
+thêm một số cơ chế, gọi là RPC, giúp việc truyền tải dữ liệu giữa các hệ thống
+được nhanh hơn. Nhưng tốc độ nhanh đòi hỏi sự mất mác dữ liệu cũng cao
+hơn, vì thế sự tin cậy cũng giảm. Một số hệ thống nổi trội tại thời kỳ này là:
+Scribe, Avro.</li>
+<li>Thế hệ thứ 3 và cũng là thế hệ mới nhất hiện giờ trong việc truyền tải và xử lý
+dữ liệu. Hệ thống ở giai đoạn này kết hợp sự tin cậy của thế hệ đầu tiên, và
+tính truyền tải dữ liệu lớn với tốc độ nhanh thông qua mô hình RPC ở thế hệ
+thứ 2. Nó có thể truyền tải dữ liệu real-time, và cũng hổ trợ ghi Log-file</li>
+</ul>
+<p>Apache Kafka [3] và Apache Flume [4] là 2 frameworks nổi trội ở thế hệ thứ 3
+này, vì nó đáp ứng được cả 2 tính chất truyền tải dữ liệu lớn real-time và lưu trữ bền
+vững dữ liệu. Tuy nhiên, về thứ tự ngữ nghĩa của dữ liệu thì bị bỏ qua ở cả 2
+frameworks này. Cả 2 frameworks này đều nổi tiếng và rất mạnh mẽ trong việc quản
+lý và truyền tải dòng dữ liệu lớn với tốc độ cao, nhưng tùy vào mục đích sử dụng mà
+ta cân nhắc tới việc lựa chọn Flume hay Kafka để triển khai.</p>
+<p>&#9733 <b> Processing</b></p>
+<p>Trong những thập kỷ trước, với việc phát minh ra những công nghệ xử lý dữ liệu
+phân tán, nội bật hơn cả là cơ chế MapReduce của Hadoop. Nó cho phép lưu trữ và
+xử lý một lượng lớn dữ liệu cùng lúc. Nhưng đáng tiếc thay, những công nghệ này
+không hổ trợ hệ thống Data Stream, việc xử lý dữ liệu Data Stream về cơ bản khác
+nhiều so với việc sử lý dữ liệu theo lô như những hệ thống Batch-Processing. Tuy
+nhiên, việc xử lý dữ liệu lớn Data Stream ngày càng phổ biến và nhu cầu ngày càng
+tăng cao. Vì thế, sự thiếu hụt khả năng xử lý dữ liệu lớn trong real-time của Hadoop
+bắt đầu là một vấn đề lớn trong việc xử lý dữ liệu trên hệ thống phân tán.</p>
+<p>Thời kỳ đầu, các nhà phát triển thông thường phải xây dựng một mạng lưới các
+queues và workers để xử lý dữ liệu real-time. Những con workers này phải xử lý dữ
+liệu của một queue, cập nhật CSDL, và gửi kết đã quả xử lý qua những queues khác
+để tiếp tục xử lý. Tuy nhiên, điều này gặp một số hạn chế [5] sau:</p>
+<ul>
+<li><b>Tedious</b>: việc tiêu tốn thời gian và chi phí đầu tư để phát triển hệ thống xử lý
+dữ liệu real-time. Đòi hỏi nguồn nhân lực để quản trị và phát triển</li>
+<li><b>Brittle</b>: hạn chế tính logic, và khả năng chịu lổi của hệ thống</li>
+<li><b>Painful to scale</b>: trong vài trường hợp lượng dữ liệu truyển cho một worker
+hay queue quá nhiều cần tới việc xử lý phân tán dữ liệu.Việc cấu hình phân
+chia công việc cho những workers khác sẽ gặp nhiều khó khăn.</li>
+</ul>
+<p>Hiện nay có rất nhiều frameworks hổ trợ làm những công việc này một cách dễ
+dàng hơn rất nhiều, tiêu biểu trong số đó là Apache Storm [5], Apache Samza6, và
+Apache Spark7. Cả 3 frameworks này đều là những frameworks mạnh mẽ và đều hổ
+trợ việc xử lý dữ liệu lớn thời gian thực. Tuy nhiên, mỗi cái có một số thế mạnh riêng
+như Storm và Samza thiêng về xư lý dữ liệu động (data in motion), còn Spark thiêng
+về việc xử lý dữ liệu tĩnh (data at rest) nhưng vẫn có cơ chế hổ trợ xử lý dữ liệu động.
+Vì thế, ta nên cân nhắc khi chọn và triển khai. Trong mục cuối của chương này sẽ,
+chúng tôi sẽ thảo luận thêm về việc chọn framework cho phù hợp với từng nhu cầu
+sử dụng.</p>
+<p>&#9733 <b> Storage</b></p>
+<p>Tầng Storage trong những hệ thống phân tích dữ liệu Data Stream thường là tầng
+lưu trữ những kết quả có được sau quá trình phân tích dữ liệu nguồn, hoặc lưu lại
+những dữ liệu có ích để hổ trợ việc khai thác sau này. Việc lựa chon csdl cho hệ thống
+phân tích Data Stream thì rất đa dạng và phong phú. Có rất nhiều csdl thỏa yêu cầu,
+nhưng đa số các hệ thống ưu thích dùng các loại csdl NoSQL. Trong đó nội bật hơn
+cả là những csdl dạng key-value trong NoSQL.</p>
+<p>Một số csdl ta có thể cân nhắc tới như là MongoDB8, RedisDB, Cassandra9, và
+data warehouse. Tất cả những CSDL này đều phụ hợp cho hệ thống khai thác Data
+Stream, vì tính mở rộng, tốc độ lưu trữ nhanh và khả năng lưu trữ dữ liệu lớn.</p>
+<p>&#9733 <b> Delivery</b></p>
+<p>Tầng Delivery là tầng trình diễn và visualizing data 10. Hầu hết các ứng dụng sử
+dụng cơ chế real-time đều thuộc loại giao diện web. Bời vì nhiều lý do thuật lợi như
+dễ dàng trong việc cài đặt, gọn nhẹ trong khâu triển khai, và có rất nhiều frameworks
+hổ trợ cho việc này. Những ứng dụng web hiện nay hổ trợ rất mạnh việc truyển tải
+hoặc lấy dữ liệu real-time, như chức năng XMLHttpRequest (XHR) có trong hầu hết
+các trình duyệt hiện nay. Ngoài ra, kỹ thuật AJAX góp phần đơn giản hóa việc truyển
+tải và lấy dữ liệu giữa Client-Server, cũng như giảm kích thước các gói tin giúp việc
+giao tiếp được nhanh hơn. Điều đó tạo cảm giác real-time cho người dùng ứng dụng
+Web.</p>
+<p>Dựa trên những phương pháp nổi bật trên, gần đây mới xuất hiện một
+framework mạnh mẽ trong việc trình diễn dữ liệu real-time là NodeJS [6].</p>
+<h2><a name="2.3">2.3. Lựa chọn từng phần cho hệ thống phân tích Data Stream</a></h2>
+<p>Mỗi frameworks kể trên có những ưu và khuyết điểm riêng và được dùng cho
+những ứng dụng cụ thể, vì vậy thật khó để so sánh những frameworks này với nhau.
+Tuy nhiên, dựa vào nhu cầu và điều kiện, ta có thể linh động trong việc thay thế các
+công nghệ này lẫn nhau. Thay vì so sánh các frameworks này với nhau, khóa luận
+đưa ra một danh sách các frameworks tương thích tốt khi làm việc cùng nhau và dễ
+dàng sử dụng cho những người mới bắt đầu tìm hiểu về lĩnh vực này.</p>
+<p>&#9733 <b> Collection</b></p>
+<p>Trong nhiều trường hợp, thành phần này không phải là một sự lựa chọn mà ta
+phải cân nhắc nhiều. Trong những doanh nghiệp, thường đã tồn tại trước những hệ
+thống giúp làm việc này rồi, và mục tiêu của ta là việc tích hợp những servers sử lý
+Data Stream vào trong một hệ thống lớn hơn.</p>
+<p>Tuy nhiên, trong một vài trường hợp chúng ta có thể phải tinh chỉnh lại thành
+phần này để thu thập những thông tin mà chúng ta cần. Những máy chủ chạy trên
+Java sẽ là một sự lựa chọn tốt để làm việc này. Bởi vì, Java là một ngôn ngữ được
+ứng dụng rộng rãi, hiệu năng tốt, và được hổ trợ bời nhiêu frameworks. Nó thực sự
+là một công cụ thích hơp để làm việc này. Trong hệ thống sẽ được trình bày ở chương
+3 thì Java là ngôn ngữ chính được dùng để triển khai cho toàn hệ thống.</p>
+<p>&#9733 <b> Data Flow</b></p>
+<p>Như đã để cập bên trên về 2 frameworks mạnh mẽ và nổi tiếng để thực hiện việc
+quản lý dòng dữ liệu, đó là Apache Flume và Apache Kafka. Cả 2 frameworks này
+đều tốt, và thật khó để so sánh chúng một cách cụ thể.</p>
+<p>Tuy nhiên, Apache Flume sẽ là một sự lựa chọn tuyệt vời cho những nơi mà đã
+tồn tại những hệ thống chạy trước đó rồi. Bởi vì nó dễ dàng cấu hình và được hổ trợ
+nhiều cho việc tích hợp vào những hệ thống lớn hơn mà không gây ra xung đột.
+Nhưng nếu ta thêm vào một hệ thống mới hoặc xây dựng một ứng dụng mới thì
+Apache Kafka sẽ tốt và dễ dàng hơn. Bên cạnh đó, Kafka còn hổ trợ rất tốt việc kết
+hợp với Apache Storm trong thành phần Processing. Vì thế, Kafka sẽ là một sự lựa
+chọn tốt cho những người mới bắt đầu khám phá hệ thống phân tích Data Stream, và
+khóa luận cũng ứng dụng công nghệ này trong mô hình thiết kế hệ thống.</p>
+<p>&#9733 <b> Processing</b></p>
+<p>Apache Storm, Samza, và Apache Spark là 3 frameworks đại diện cho tầng xử lý
+của toàn hệ thống. Chúng đều là những frameworks mạnh mẽ và đầy tìm năng trong
+tương lại. Samza là một framework rất mới và được phát triển dựa trên Apache
+YARN11, vì vậy nó không thực sự là một sự lựa chon tuyệt vời bởi khả năng xử lý dữ
+liệu động không mạnh mẽ như 2 frameworks kia. Bên cạnh đó, vì còn rất mới nên
+dường như không có nhiều modules hổ trợ việc tịch hợp với những frameworks khác
+và cộng đồng phát triển không đông, điều này gây nhiều khó khăn trong việc triển
+khai và phát triển.</p>
+<p>Apache Storm và Apache Spark là 2 frameworks trưởng thành hơn khi so với
+Samza. Mặc dù Spark có hổ trợ xử lý dữ liệu động nhờ vào module Spark Streaming,
+nhưng nó tương đối phực tạp hơn Storm trong khâu triển khai. Apache Storm chuyên
+xử lý dữ liệu động trong môi trường phân tán. Bên cạnh đó việc kết hợp tuyệt vời giữa
+Kafka-Storm sẽ đảm bảo được việc xử lý dữ liệu một cách chính xác với hiệu năng
+cao. Apache Storm là một framework gọn nhẹ, khả năng chịu lỗi cao và có một cộng
+đồng phát triển ngày càng đông, điều đó cho thấy được tìm năng của Storm trong
+tương lai không xa so với những framework khác trong việc xử lý Data Stream. Vì
+thế, Storm được nhóm chọn là framework chính cho toàn hệ thống để thực hiên việc
+xử lý dữ liệu.</p>
+<p>&#9733 <b> Storage</b></p>
+<p>Tùy nhu cầu người dùng mà cân nhắc tới việc sử dụng CSDL nào cho phù hợp.
+Nếu ta cần một nơi lưu trữ dữ liệu lớn với cấu trúc dữ liệu phức tạp, có khả năng mở
+rộng cao mà tốc độ truy vẫn tương đối nhanh thì MongoDB sẽ là một lựa chọn tuyệt
+vời. Bên cạnh đó, lưu trữ dữ liệu dạng key-value như RedisDB sẽ rất hiệu quả trong
+trường hợp dữ liệu thường xuyên được cập nhật và cần một nơi lưu trữ và truy vấn
+dữ liệu với tốc độ cao. Tuy nhiên, những câu truy vấn thường đơn giản và cấu trúc
+dữ liệu lưu trữ đơn giản, sẽ thích hợp cho những ứng dụng ít tương tác như là
+dashboard.
+<p>Trong khóa luận, chúng tôi sử dụng RedisDB để làm csdl trung gian, giúp việc
+hiển thị dữ liệu kết quả. Bởi vì, Redis lưu trữ dữ liệu trên Ram nên tốc độ cực cao,
+bên cạnh đó Redis Cluster sẽ là một điểm sáng trong việc trao đổi kết quả xử lý và
+truy vấn dữ liệu trên các nodes trong Storm.</p>
+<p>&#9733 <b> Delivery</b></p>
+<p>Để làm nhiệm vụ hiển thị và visualize dữ liệu trả về trong môi trường real-time
+một cách mượt mà cần có một framework nhẹ và nhanh. NodeJS là một trong số đó,
+nó là một framework javascript nhưng vẫn có thể chạy cả ở client lẫn server, với việc
+xử lý và hiển thị dữ liệu cực nhanh làm cho người dùng có thể cảm nhận được sự
+real-time trong qua trình vận hành và sử lý dữ liệu.</p>
+<p>Với những tính năng như lấy và hiển thị dữ liệu nhanh, dể dàng cài đặt trên bất
+kỳ web service nào, ngôn ngữ javascript thân thiện. NodeJS thật sử là một sự lựa chọn
+tuyệt vời cho những reports real-time.</p>
+<h2><a name="2.4">2.4. Tổng kết</a></h2>
+<p>Trong chương này, chúng tôi đã giới thiệu về một loại dữ liệu mới là Data Stream,
+ý nghĩa việc khai thác nó, những thách thức và khó khăn đặt ra trong quá trình khai
+thác loại dữ liệu này. Mặc dù đã có rất nhiều công nghệ được đưa ra để hỗ trợ việc
+phân tích trên Data Stream, nhưng chúng còn rất rời rạc và chưa gắn kết chặt chẽ với
+nhau để trở thành một hệ thống mạnh mẽ và tìm năng trong việc khai thác dữ liệu
+trực tiếp từ Data Stream. Đồng tình với quan điểm này, tác giả của tài liệu [1] đã đưa
+ra một kiến trúc tổng quan về 5 thành phần cần có của một hệ thống khai thác Data
+Stream. Tuy nhiên, kiến trúc này còn rất trừu tượng và chưa chỉ ra được sự liên kết
+của 5 thành phần này trong việc triển khai. Dựa trên những hạn chế đó, chúng tôi đã
+khảo sát trên nhiều công nghệ khác nhau nhằm xây dựng lên một mô hình thiết thực
+33
+cho việc triển khai Data Stream và dễ dàng trong việc tích hợp vào hệ thống lớn hơn.
+Chúng tôi đã nhận thấy rằng, bằng cách kết hợp 5 công nghệ mới một cách có logic,
+chúng ta có thể xây dựng lên một hệ thống khai thác Data Stream mạnh mẽ về hiệu
+năng và khả năng chịu lổi cao khi triển khai thực tế. Hơn thế nữa, bằng việc tích hợp
+thêm vào hệ thống 2 thuật toán khai thác tập phổ biến được trình bày trong chương 6
+và 7, chúng góp phần làm hệ thống mạnh mẽ hơn rất nhiều trong việc khai thác những
+thông tin tìm ẩn trong Data Stream.</p>
+<p>Chương kế tiếp chung tôi sẽ trình bày mẫu thiết kế chi tiết cho hệ thống phân tích
+Data Stream. Bằng việc kết hợp các thành phần này một cách logic, hệ thống sẽ đạt
+được hiệu năng tối ưu hơn và dễ dàng hơn trong việc phân tích và truy vấn dữ liệu
+thời gian thực.</p>
+</body>
+</html>
